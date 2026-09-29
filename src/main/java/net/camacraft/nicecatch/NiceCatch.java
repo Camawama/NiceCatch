@@ -29,5 +29,6 @@ public class NiceCatch
 
         context.registerConfig(ModConfig.Type.SERVER, NiceCatchConfig.SERVER_SPEC);
         context.registerConfig(ModConfig.Type.CLIENT, NiceCatchConfig.CLIENT_SPEC);
+        ConfigMigrations.register(modBus);
     }
 }

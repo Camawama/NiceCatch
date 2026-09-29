@@ -78,7 +78,10 @@ public final class FishCarryRenderer
     private static final float CARRY_LEVEL = 15.0F;
 
     private static final Map<Item, EntityType<?>> TYPE_BY_ITEM = new HashMap<>();
-    private static final Map<EntityType<?>, Entity> DUMMIES = new HashMap<>();
+    /** Dummies are cached per item AND per stamped variant, so every tropical fish caught
+     * shows ITS OWN pattern in hand instead of the species default. */
+    private record DummyKey(Item item, int variant) {}
+    private static final Map<DummyKey, Entity> DUMMIES = new HashMap<>();
     private static final Set<Entity> DISPLAY = Collections.newSetFromMap(new IdentityHashMap<>());
     @Nullable private static Level dummyLevel;
 
@@ -94,17 +97,15 @@ public final class FishCarryRenderer
     @Nullable
     public static Entity displayFor(ItemStack stack)
     {
-        return stack.isEmpty() ? null : displayEntity(stack.getItem());
+        return stack.isEmpty() ? null : displayEntity(stack);
     }
 
-    /**
-     * Registers an EXTERNAL display dummy (the fish tank keeps its own — sharing ours let
-     * a tank's motion puppet the fish item in the player's hand) so the world-fish render
-     * hooks skip it like they skip ours.
-     */
-    public static void markDisplayEntity(Entity entity)
+    /** The caught individual's "Variant" from its stamped entity snapshot (0 = default). */
+    private static int stackVariant(ItemStack stack)
     {
-        DISPLAY.add(entity);
+        CompoundTag info = stack.getTagElement("NiceCatch");
+        if (info == null || !info.contains("Entity", Tag.TAG_COMPOUND)) return 0;
+        return info.getCompound("Entity").getInt("Variant");
     }
 
     /**
@@ -120,7 +121,7 @@ public final class FishCarryRenderer
             return false;
         }
         if (stack.isEmpty() || !isFishStack(stack)) return false;
-        Entity display = displayEntity(stack.getItem());
+        Entity display = displayEntity(stack);
         if (display == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
@@ -275,10 +276,11 @@ public final class FishCarryRenderer
         return Mth.clamp((float) Math.cbrt(volume / baseVolume), 0.4F, 2.8F);
     }
 
-    /** The cached, never-ticked display entity for this fish item; null = no entity match. */
+    /** The cached, never-ticked display entity for this fish stack; null = no entity match. */
     @Nullable
-    private static Entity displayEntity(Item item)
+    private static Entity displayEntity(ItemStack stack)
     {
+        Item item = stack.getItem();
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return null;
         if (dummyLevel != mc.level) {
@@ -290,7 +292,8 @@ public final class FishCarryRenderer
         }
         EntityType<?> type = typeFor(item);
         if (type == null) return null;
-        Entity cached = DUMMIES.get(type);
+        DummyKey key = new DummyKey(item, stackVariant(stack));
+        Entity cached = DUMMIES.get(key);
         if (cached != null) return cached;
         Entity created = type.create(mc.level);
         if (created == null || !FishBehavior.isFishKind(created)) {
@@ -298,7 +301,17 @@ public final class FishCarryRenderer
             TYPE_BY_ITEM.put(item, null); // negative-cache: not a renderable fish
             return null;
         }
-        DUMMIES.put(type, created);
+        // A stamped catch carries its full entity snapshot: loading it dresses the dummy
+        // as the exact caught individual — a tropical fish keeps ITS pattern and colors.
+        CompoundTag info = stack.getTagElement("NiceCatch");
+        if (info != null && info.contains("Entity", Tag.TAG_COMPOUND)) {
+            try {
+                created.load(info.getCompound("Entity").copy());
+            } catch (Exception ignored) {
+                // A snapshot from another mod version that no longer loads: default look.
+            }
+        }
+        DUMMIES.put(key, created);
         DISPLAY.add(created);
         return created;
     }

@@ -1,9 +1,8 @@
 package net.camacraft.nicecatch.network;
 
+import net.camacraft.camafy.network.Packets;
 import net.camacraft.nicecatch.client.FishingLineRenderer;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -40,8 +39,6 @@ public class ArrowLineMessage
 
     public static void handle(ArrowLineMessage msg, Supplier<NetworkEvent.Context> ctx)
     {
-        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> FishingLineRenderer.handleLine(msg.playerId, msg.fishId, msg.active)));
-        ctx.get().setPacketHandled(true);
+        Packets.handleClient(ctx, () -> () -> FishingLineRenderer.handleLine(msg.playerId, msg.fishId, msg.active));
     }
 }

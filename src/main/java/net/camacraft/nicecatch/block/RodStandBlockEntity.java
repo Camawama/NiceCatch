@@ -248,7 +248,8 @@ public class RodStandBlockEntity extends BlockEntity
         serverLevel.playSound(null, hook.getX(), hook.getY(), hook.getZ(),
                 SoundEvents.FISHING_BOBBER_SPLASH, SoundSource.BLOCKS, 0.5F, 0.9F);
         if (stand.bell) {
-            serverLevel.playSound(null, pos, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS, 1.2F, 1.0F);
+            // A tiny bell rings tiny: well up the pitch scale, like a shop-door chime.
+            serverLevel.playSound(null, pos, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS, 1.2F, 1.9F);
         }
     }
 

@@ -1,5 +1,6 @@
 package net.camacraft.nicecatch.server;
 
+import net.camacraft.camafy.config.IdMatcher;
 import net.camacraft.nicecatch.NiceCatch;
 import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.RodUtil;
@@ -11,6 +12,7 @@ import net.camacraft.nicecatch.server.goal.HuntPreyGoal;
 import net.camacraft.nicecatch.server.goal.ScatterGoal;
 import net.camacraft.nicecatch.server.goal.SchoolBoidsGoal;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
@@ -120,6 +122,14 @@ public final class FishBehavior
     private static final Map<net.minecraft.world.entity.EntityType<?>, Boolean> WHITELIST_CACHE
             = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** Entries are entity ids ('mod:fish'), namespace wildcards ('mod:*'), or anything else IdMatcher reads. */
+    private static final IdMatcher.Cached<net.minecraft.world.entity.EntityType<?>> BLACKLIST = IdMatcher.cached(
+            BuiltInRegistries.ENTITY_TYPE, "Nice Catch fishAiBlacklist", () -> NiceCatchConfig.SERVER.fishAiBlacklist.get());
+    private static final IdMatcher.Cached<net.minecraft.world.entity.EntityType<?>> WHITELIST = IdMatcher.cached(
+            BuiltInRegistries.ENTITY_TYPE, "Nice Catch fishAiWhitelist", () -> NiceCatchConfig.SERVER.fishAiWhitelist.get());
+    private static final IdMatcher.Cached<net.minecraft.world.entity.EntityType<?>> BOID_BLACKLIST = IdMatcher.cached(
+            BuiltInRegistries.ENTITY_TYPE, "Nice Catch boidBlacklist", () -> NiceCatchConfig.SERVER.boidBlacklist.get());
+
     /**
      * Counts as a fish for this mod's purposes: vanilla's AbstractFish family, or a whitelisted
      * water mob from a mod that rolled its own fish hierarchy (Unusual Fish extends WaterAnimal
@@ -148,14 +158,12 @@ public final class FishBehavior
      */
     public static boolean isBlacklisted(net.minecraft.world.entity.EntityType<?> type)
     {
-        return BLACKLIST_CACHE.computeIfAbsent(type,
-                t -> matchesList(t, NiceCatchConfig.SERVER.fishAiBlacklist.get()));
+        return BLACKLIST_CACHE.computeIfAbsent(type, BLACKLIST::matches);
     }
 
     public static boolean isWhitelisted(net.minecraft.world.entity.EntityType<?> type)
     {
-        return WHITELIST_CACHE.computeIfAbsent(type,
-                t -> matchesList(t, NiceCatchConfig.SERVER.fishAiWhitelist.get()));
+        return WHITELIST_CACHE.computeIfAbsent(type, WHITELIST::matches);
     }
 
     /**
@@ -165,23 +173,7 @@ public final class FishBehavior
      */
     public static boolean isBoidBlacklisted(net.minecraft.world.entity.EntityType<?> type)
     {
-        return BOID_BLACKLIST_CACHE.computeIfAbsent(type,
-                t -> matchesList(t, NiceCatchConfig.SERVER.boidBlacklist.get()));
-    }
-
-    /** Entries are exact entity ids ('mod:fish') or namespace wildcards ('mod:*'). */
-    private static boolean matchesList(net.minecraft.world.entity.EntityType<?> type, List<? extends String> entries)
-    {
-        var id = net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.getKey(type);
-        if (id == null) return false;
-        for (String raw : entries) {
-            String entry = raw.trim();
-            if (entry.equals(id.toString())) return true;
-            if (entry.endsWith(":*") && id.getNamespace().equals(entry.substring(0, entry.length() - 2))) {
-                return true;
-            }
-        }
-        return false;
+        return BOID_BLACKLIST_CACHE.computeIfAbsent(type, BOID_BLACKLIST::matches);
     }
 
     /** The caches must not outlive the config values they were computed from. */

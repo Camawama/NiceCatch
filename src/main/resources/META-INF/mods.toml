@@ -24,6 +24,13 @@ description='''${mod_description}'''
     side="BOTH"
 
 [[dependencies.${mod_id}]]
+    modId="camafy"
+    mandatory=true
+    versionRange="${camafy_version_range}"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
     modId="aquaculture"
     mandatory=false
     versionRange="[2.0,)"

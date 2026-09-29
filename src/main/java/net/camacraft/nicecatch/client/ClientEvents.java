@@ -12,10 +12,8 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.ComputeFovModifierEvent;
 import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -163,15 +161,6 @@ public class ClientEvents
                 event.setCancellationResult(InteractionResult.CONSUME);
             }
         }
-    }
-
-    @SubscribeEvent
-    public static void onOverlayRender(RenderGuiOverlayEvent.Pre event)
-    {
-        if (ClientFishing.phase() == ClientFishing.Phase.IDLE && ClientFishing.celebrateTicks() <= 0) return;
-        if (!event.getOverlay().id().equals(VanillaGuiOverlay.EXPERIENCE_BAR.id())) return;
-        event.setCanceled(true);
-        FishingBarOverlay.render(event.getGuiGraphics(), event.getWindow(), event.getPartialTick());
     }
 
     /** Draws the fishing line from the player to the fish during a line-arrow fight. */

@@ -1,5 +1,8 @@
 package net.camacraft.nicecatch.client;
 
+import net.camacraft.camafy.compat.gravity.Gravity;
+import net.camacraft.camafy.compat.gravity.GravityFrame;
+import net.camacraft.camafy.util.anim.Easing;
 import net.camacraft.nicecatch.FightPhase;
 import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.RodUtil;
@@ -240,8 +243,7 @@ public class ClientFishing
     {
         float half = NiceCatchConfig.CLIENT.chargeSweepTicks.get();
         float t = (chargeTicks + partialTick) / half;
-        float sweep = t % 2.0F;
-        return sweep <= 1.0F ? sweep : 2.0F - sweep;
+        return Easing.pingPong(t);
     }
 
     public static boolean canStartCharge()
@@ -516,9 +518,15 @@ public class ClientFishing
         followY += (hookPos.y - followY) * trail;
         followZ += (hookPos.z - followZ) * trail;
 
-        double dx = followX - player.getX();
-        double dy = followY - player.getEyeY();
-        double dz = followZ - player.getZ();
+        // Aimed in the angler's own gravity frame (Camafy; the world frame unless a gravity mod
+        // has turned them): yaw and pitch live in that frame, so a sideways-standing angler
+        // still pans toward the fish instead of toward where it would be for an upright one.
+        GravityFrame frame = Gravity.frame(player);
+        Vec3 eye = player.position().add(frame.localToWorld(0.0D, player.getEyeHeight(), 0.0D));
+        Vec3 to = frame.worldToLocal(new Vec3(followX, followY, followZ).subtract(eye));
+        double dx = to.x;
+        double dy = to.y;
+        double dz = to.z;
         double horiz = Math.sqrt(dx * dx + dz * dz);
         if (horiz < 0.5D) return; // fish is basically underfoot; nothing sensible to aim at
 

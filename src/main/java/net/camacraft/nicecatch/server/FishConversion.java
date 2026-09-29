@@ -156,19 +156,21 @@ public final class FishConversion
         return level.getEntity(id) instanceof PathfinderMob fish && fish.isAlive() ? fish : null;
     }
 
-    /** Swap the flying fish for its item: splash, pickup sound, straight into the inventory. */
-    private static void convert(ServerPlayer player, PathfinderMob fish, float doubleCatchChance, boolean skipRelease)
+    /**
+     * The caught fish as its stamped item: weight, traits, and the FULL entity snapshot
+     * (UUID kept — size and traits derive from it; variant, health, everything). The
+     * snapshot is what makes a caught fish item a LIVE fish: tanks release exactly the
+     * individual that was caught, and renderers can show its true colors (a tropical
+     * fish's pattern lives in that NBT). Plain loot-table fillets carry no snapshot and
+     * are, as far as any of this is concerned, dinner.
+     */
+    public static ItemStack snapshotItem(ServerLevel level, PathfinderMob fish)
     {
-        ServerLevel level = player.serverLevel();
         ItemStack stack = itemFor(level, fish);
-
-        // The UUID stays in the snapshot: size and traits derive from it, so a released fish
-        // comes back as exactly the fish that was caught. (Safe — the original is discarded.)
         CompoundTag nbt = new CompoundTag();
         fish.saveWithoutId(nbt);
         nbt.putUUID("UUID", fish.getUUID());
 
-        // Stamp the catch: weight from the individual's scaled hitbox, plus any born traits.
         float weightKg = FishSizing.weightKg(fish);
         FishTraits.Modifiers traits = FishTraits.of(fish);
         CompoundTag info = new CompoundTag();
@@ -180,7 +182,26 @@ public final class FishConversion
             }
             info.put("Traits", traitIds);
         }
+        info.put("Entity", nbt);
         stack.addTagElement("NiceCatch", info);
+        return stack;
+    }
+
+    /** The live-fish test: only an item carrying a full entity snapshot can come back to life. */
+    public static boolean hasLiveSnapshot(ItemStack stack)
+    {
+        CompoundTag info = stack.getTagElement("NiceCatch");
+        return info != null && info.contains("Entity", net.minecraft.nbt.Tag.TAG_COMPOUND);
+    }
+
+    /** Swap the flying fish for its item: splash, pickup sound, straight into the inventory. */
+    private static void convert(ServerPlayer player, PathfinderMob fish, float doubleCatchChance, boolean skipRelease)
+    {
+        ServerLevel level = player.serverLevel();
+        ItemStack stack = snapshotItem(level, fish);
+        CompoundTag nbt = stack.getTagElement("NiceCatch").getCompound("Entity");
+        float weightKg = stack.getTagElement("NiceCatch").getFloat("Weight");
+        FishTraits.Modifiers traits = FishTraits.of(fish);
 
         level.sendParticles(ParticleTypes.SPLASH, fish.getX(), fish.getY() + 0.2D, fish.getZ(), 8, 0.2D, 0.15D, 0.2D, 0.0D);
         level.sendParticles(ParticleTypes.BUBBLE_POP, fish.getX(), fish.getY() + 0.2D, fish.getZ(), 4, 0.15D, 0.1D, 0.15D, 0.02D);

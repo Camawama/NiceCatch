@@ -1,8 +1,8 @@
 package net.camacraft.nicecatch.network;
 
+import net.camacraft.camafy.network.Packets;
 import net.camacraft.nicecatch.server.ServerFishingManager;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -35,12 +35,6 @@ public class CastMessage
 
     public static void handle(CastMessage msg, Supplier<NetworkEvent.Context> ctx)
     {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer sender = ctx.get().getSender();
-            if (sender != null) {
-                ServerFishingManager.onCast(sender, msg.power, msg.hand);
-            }
-        });
-        ctx.get().setPacketHandled(true);
+        Packets.handleServer(ctx, sender -> ServerFishingManager.onCast(sender, msg.power, msg.hand));
     }
 }

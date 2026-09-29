@@ -66,6 +66,7 @@ mixin {
 }
 
 repositories {
+    mavenLocal()
     maven {
         name = 'CurseMaven'
         url = 'https://cursemaven.com'
@@ -76,6 +77,8 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+
+    implementation fg.deobf("net.camacraft.camafy:camafy:${camafy_version}")
 
     // Optional compat target; present in the dev runtime, never bundled or required.
     implementation fg.deobf("curse.maven:aquaculture-60028:7331172")
@@ -90,6 +93,7 @@ tasks.named('processResources', ProcessResources).configure {
             loader_version_range: loader_version_range,
             mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
             mod_authors: mod_authors, mod_description: mod_description,
+            camafy_version_range: camafy_version_range,
     ]
     inputs.properties replaceProperties
 

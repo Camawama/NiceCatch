@@ -1,9 +1,8 @@
 package net.camacraft.nicecatch.network;
 
+import net.camacraft.camafy.network.Packets;
 import net.camacraft.nicecatch.client.ClientFishing;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -34,8 +33,6 @@ public class FightEndMessage
 
     public static void handle(FightEndMessage msg, Supplier<NetworkEvent.Context> ctx)
     {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientFishing.handleFightEnd(msg.result)));
-        ctx.get().setPacketHandled(true);
+        Packets.handleClient(ctx, () -> () -> ClientFishing.handleFightEnd(msg.result));
     }
 }

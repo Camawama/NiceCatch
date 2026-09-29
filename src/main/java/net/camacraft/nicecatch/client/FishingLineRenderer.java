@@ -2,6 +2,7 @@ package net.camacraft.nicecatch.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.camacraft.camafy.compat.gravity.Gravity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -94,7 +95,8 @@ public final class FishingLineRenderer
         double dy = end.y - start.y;
         double dz = end.z - start.z;
         double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        double sag = Math.min(0.6D, dist * 0.04D);
+        // a line sags as far as gravity pulls it: straight in VS Genesis's space or an Ad Astra orbit
+        double sag = Math.min(0.6D, dist * 0.04D) * Math.min(1.0D, Gravity.ambientStrength(angler));
 
         int segments = 16;
         float prevX = 0.0F, prevY = 0.0F, prevZ = 0.0F;

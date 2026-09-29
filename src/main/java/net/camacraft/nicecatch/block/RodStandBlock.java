@@ -98,7 +98,7 @@ public class RodStandBlock extends BaseEntityBlock
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 stand.setBell(true);
                 level.setBlock(pos, level.getBlockState(pos).setValue(HAS_BELL, true), 3);
-                level.playSound(null, pos, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS, 0.7F, 1.3F);
+                level.playSound(null, pos, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS, 0.7F, 1.9F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }

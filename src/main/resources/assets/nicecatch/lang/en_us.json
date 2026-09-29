@@ -37,6 +37,8 @@
   "nicecatch.hooked.warning": "You've been hooked! Hold sneak to break free!",
   "nicecatch.hooked.freed": "You broke free of the line!",
   "nicecatch.line_cut": "Line cut.",
+  "nicecatch.tank.needs_water": "The tank needs water first",
+  "nicecatch.tank.too_small": "This tank is too small for that fish",
   "key.categories.nicecatch": "Nice Catch",
   "key.nicecatch.rod_control": "Rod Control (hold)",
   "key.nicecatch.cut_line": "Cut the Line",

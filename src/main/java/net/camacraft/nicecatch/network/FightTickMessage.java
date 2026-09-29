@@ -1,9 +1,8 @@
 package net.camacraft.nicecatch.network;
 
+import net.camacraft.camafy.network.Packets;
 import net.camacraft.nicecatch.client.ClientFishing;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -60,10 +59,8 @@ public class FightTickMessage
 
     public static void handle(FightTickMessage msg, Supplier<NetworkEvent.Context> ctx)
     {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                        ClientFishing.handleFightTick(msg.progress, msg.tension, msg.fatigue,
-                                msg.fishRunning, msg.phase, msg.dartDir, msg.tier, msg.chainBite)));
-        ctx.get().setPacketHandled(true);
+        Packets.handleClient(ctx, () -> () ->
+                ClientFishing.handleFightTick(msg.progress, msg.tension, msg.fatigue,
+                        msg.fishRunning, msg.phase, msg.dartDir, msg.tier, msg.chainBite));
     }
 }

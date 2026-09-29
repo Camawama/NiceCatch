@@ -1,38 +1,63 @@
 package net.camacraft.nicecatch.client;
 
-import com.mojang.blaze3d.platform.Window;
+import net.camacraft.camafy.client.anim.Blink;
+import net.camacraft.camafy.client.gui.hud.HudBar;
+import net.camacraft.camafy.client.gui.hud.HudHint;
+import net.camacraft.camafy.client.gui.hud.XpBarSlot;
+import net.camacraft.camafy.util.color.Argb;
+import net.camacraft.nicecatch.NiceCatch;
 import net.camacraft.nicecatch.NiceCatchConfig;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 
 /**
  * Draws the fishing bar in the XP bar's slot (the way the horse jump bar replaces it):
  * a cyan oscillating bar while charging a cast, a flashing red bar while a fish is biting,
- * and a green-to-red (by line tension) progress bar during the fight.
+ * and a green-to-red (by line tension) progress bar during the fight. The slot is claimed
+ * through Camafy, which draws one mod's bar per frame.
  */
 public class FishingBarOverlay
 {
-    private static final ResourceLocation GUI_ICONS = ResourceLocation.withDefaultNamespace("textures/gui/icons.png");
+    /** Above Better Toss's throw bar: a cast or a fight in progress wins the slot. */
+    private static final int SLOT_PRIORITY = 200;
+    /** Flashing hints hide for the second half of every 12 ticks. */
+    private static final Blink HINT_FLASH = new Blink(12, 6);
 
-    public static void render(GuiGraphics graphics, Window window, float partialTick)
+    /** Claims the XP bar's slot; called once at client setup. */
+    public static void register()
     {
-        int x = window.getGuiScaledWidth() / 2 - 91;
-        int y = window.getGuiScaledHeight() - 32 + 3;
+        XpBarSlot.claim(ResourceLocation.fromNamespaceAndPath(NiceCatch.MODID, "fishing_bar"), SLOT_PRIORITY,
+                new XpBarSlot.Claim()
+                {
+                    @Override
+                    public boolean active()
+                    {
+                        return ClientFishing.phase() != ClientFishing.Phase.IDLE || ClientFishing.celebrateTicks() > 0;
+                    }
 
+                    @Override
+                    public void render(GuiGraphics graphics, int x, int y, float partialTick)
+                    {
+                        FishingBarOverlay.render(graphics, x, y, partialTick);
+                    }
+                });
+    }
+
+    /** {@code (x, y)} is the XP bar's top-left. */
+    public static void render(GuiGraphics graphics, int x, int y, float partialTick)
+    {
         switch (ClientFishing.phase()) {
             case CHARGING -> {
-                drawBackground(graphics, x, y);
-                drawFill(graphics, x, y, ClientFishing.chargeValue(partialTick), 0xFF3CB4E7);
-                drawHint(graphics, window, y, "nicecatch.hint.charge", 0xFF9BDCF5, false);
+                HudBar.draw(graphics, x, y, ClientFishing.chargeValue(partialTick), 0xFF3CB4E7, HudBar.Style.XP_BEVEL);
+                drawHint(graphics, "nicecatch.hint.charge", 0xFF9BDCF5, false);
             }
             case BITE -> {
-                drawBackground(graphics, x, y);
+                HudBar.background(graphics, x, y, HudBar.Style.XP_BEVEL);
                 boolean flashOn = (ClientFishing.biteTicks() / 4) % 2 == 0;
                 if (flashOn) {
-                    drawFill(graphics, x, y, 1.0F, ClientFishing.isEntityBite() ? 0xFFE03434 : 0xFFE8C33A);
+                    HudBar.fill(graphics, x, y, 1.0F, ClientFishing.isEntityBite() ? 0xFFE03434 : 0xFFE8C33A,
+                            HudBar.Style.XP_BEVEL);
                 }
                 // A directional bite tells the player which way to yank; the hint flashes on its
                 // own cadence (not the shared flash gate) so the direction is never off-screen long.
@@ -42,28 +67,26 @@ public class FishingBarOverlay
                             case 2 -> "nicecatch.hint.bite_right";
                             default -> "nicecatch.hint.bite";
                         };
-                drawHint(graphics, window, y, key, 0xFFFF6A5A, ClientFishing.biteDirection() == 0);
+                drawHint(graphics, key, 0xFFFF6A5A, ClientFishing.biteDirection() == 0);
             }
             case REEL -> {
-                drawBackground(graphics, x, y);
                 boolean item = ClientFishing.isReelItem();
                 int color = item ? 0xFFC79A4E : 0xFF5FBFE0; // amber while reeling an item, cyan for empty line
-                drawFill(graphics, x, y, ClientFishing.shownProgress(), color);
-                drawHint(graphics, window, y,
-                        item ? "nicecatch.hint.reel_item" : "nicecatch.hint.reel_empty", color, false);
+                HudBar.draw(graphics, x, y, ClientFishing.shownProgress(), color, HudBar.Style.XP_BEVEL);
+                drawHint(graphics, item ? "nicecatch.hint.reel_item" : "nicecatch.hint.reel_empty", color, false);
             }
             case FIGHT -> {
                 float t = (float) (ClientFishing.fightTicks() + partialTick);
                 if (ClientFishing.isFishRunning()) {
-                    x += Math.round(Mth.sin(t * 1.9F) * 1.5F);
+                    x += HudBar.jitterFast(t, 1.9F, 1.5F);
                 }
-                drawBackground(graphics, x, y);
+                HudBar.background(graphics, x, y, HudBar.Style.XP_BEVEL);
                 int color = tensionColor(ClientFishing.tension());
                 // High tension warning: flash the fill toward red.
                 if (ClientFishing.tension() > 0.8F && (ClientFishing.fightTicks() / 3) % 2 == 0) {
                     color = 0xFFFF2020;
                 }
-                drawFill(graphics, x, y, ClientFishing.shownProgress(), color);
+                HudBar.fill(graphics, x, y, ClientFishing.shownProgress(), color, HudBar.Style.XP_BEVEL);
 
                 // Lift-reactive coaching: the moment the lift registers, hints that asked
                 // for it turn green — instant confirmation the input is landing. (The rod
@@ -74,32 +97,31 @@ public class FishingBarOverlay
                     // A chain bite is the fight's biggest moment — it owns the hint slot
                     // for a few seconds. (It used to go to the vanilla actionbar, which
                     // draws at this exact height and overlapped these hints into mush.)
-                    drawHint(graphics, window, y, "nicecatch.chain", 0xFFFFB03A, true);
+                    drawHint(graphics, "nicecatch.chain", 0xFFFFB03A, true);
                 } else if (ClientFishing.tension() > 0.8F) {
-                    drawHint(graphics, window, y, "nicecatch.hint.tension", 0xFFFF4040, true);
+                    drawHint(graphics, "nicecatch.hint.tension", 0xFFFF4040, true);
                 } else if (ClientFishing.dartDirection() != 0) {
                     // A dart demands its counter-pull NOW; it outranks every calm hint.
-                    drawHint(graphics, window, y, ClientFishing.dartDirection() == 1
+                    drawHint(graphics, ClientFishing.dartDirection() == 1
                             ? "nicecatch.hint.dart_left" : "nicecatch.hint.dart_right", 0xFFF08A3A, true);
                 } else if (ClientFishing.fatigue() > 0.85F) {
-                    drawHint(graphics, window, y, "nicecatch.hint.tired", 0xFF7EE0C8, false);
+                    drawHint(graphics, "nicecatch.hint.tired", 0xFF7EE0C8, false);
                 } else {
                     // Coach the response to whatever the fish is doing right now.
                     switch (ClientFishing.fightPhase()) {
-                        case HOLD -> drawHint(graphics, window, y, "nicecatch.hint.phase.hold", 0xFFB6E8A0, false);
-                        case SWEEP -> drawHint(graphics, window, y, "nicecatch.hint.phase.sweep", 0xFFB6E8A0, false);
-                        case PULL -> drawHint(graphics, window, y, "nicecatch.hint.run",
+                        case HOLD -> drawHint(graphics, "nicecatch.hint.phase.hold", 0xFFB6E8A0, false);
+                        case SWEEP -> drawHint(graphics, "nicecatch.hint.phase.sweep", 0xFFB6E8A0, false);
+                        case PULL -> drawHint(graphics, "nicecatch.hint.run",
                                 lifting ? 0xFF7EE044 : 0xFFE8C33A, false);
-                        case SOUND -> drawHint(graphics, window, y, "nicecatch.hint.phase.sound",
+                        case SOUND -> drawHint(graphics, "nicecatch.hint.phase.sound",
                                 lifting ? 0xFF7EE044 : 0xFFE8C33A, false);
-                        case CHARGE -> drawHint(graphics, window, y, "nicecatch.hint.phase.charge", 0xFFF08A3A, true);
+                        case CHARGE -> drawHint(graphics, "nicecatch.hint.phase.charge", 0xFFF08A3A, true);
                     }
                 }
             }
             default -> {
                 if (ClientFishing.celebrateTicks() > 0) {
-                    drawBackground(graphics, x, y);
-                    drawFill(graphics, x, y, 1.0F, 0xFF7EE044);
+                    HudBar.draw(graphics, x, y, 1.0F, 0xFF7EE044, HudBar.Style.XP_BEVEL);
                     // No hint here: the server's actionbar line (name, weight, traits) owns
                     // this screen spot during the celebration.
                 }
@@ -111,63 +133,23 @@ public class FishingBarOverlay
      * One-line coaching text so nobody has to guess the controls. Drawn where the vanilla
      * actionbar text lives (well above the hotbar) so it never overlaps hearts or hunger.
      */
-    private static void drawHint(GuiGraphics graphics, Window window, int barY, String key, int color, boolean flash)
+    private static void drawHint(GuiGraphics graphics, String key, int color, boolean flash)
     {
         if (!NiceCatchConfig.CLIENT.showHints.get()) return;
-        if (flash && (ClientFishing.biteTicks() + ClientFishing.fightTicks()) / 6 % 2 == 1) return;
-        Minecraft mc = Minecraft.getInstance();
-        graphics.drawCenteredString(mc.font, Component.translatable(key),
-                window.getGuiScaledWidth() / 2, window.getGuiScaledHeight() - 68, color);
-    }
-
-    private static void drawBackground(GuiGraphics graphics, int x, int y)
-    {
-        graphics.blit(GUI_ICONS, x, y, 0, 64, 182, 5);
-    }
-
-    /** Draws a smooth 5px-tall fill with a highlight top row and shadow bottom row, matching the bar sprites. */
-    private static void drawFill(GuiGraphics graphics, int x, int y, float fraction, int color)
-    {
-        int width = Math.round(Mth.clamp(fraction, 0.0F, 1.0F) * 182.0F);
-        if (width <= 0) return;
-        int top = brighten(color, 0.45F);
-        int bottom = darken(color, 0.45F);
-        graphics.fill(x, y, x + width, y + 1, top);
-        graphics.fill(x, y + 1, x + width, y + 4, color);
-        graphics.fill(x, y + 4, x + width, y + 5, bottom);
+        Component text = Component.translatable(key);
+        if (flash) {
+            HudHint.draw(graphics, text, color, HINT_FLASH, ClientFishing.biteTicks() + ClientFishing.fightTicks());
+        } else {
+            HudHint.draw(graphics, text, color);
+        }
     }
 
     /** Lime when relaxed, gold at half tension, red near the snapping point. */
     private static int tensionColor(float tension)
     {
         if (tension < 0.5F) {
-            return lerpColor(tension * 2.0F, 0xFF7EE044, 0xFFE8C33A);
+            return Argb.lerpRgb(tension * 2.0F, 0xFF7EE044, 0xFFE8C33A);
         }
-        return lerpColor((tension - 0.5F) * 2.0F, 0xFFE8C33A, 0xFFE03434);
-    }
-
-    private static int lerpColor(float t, int from, int to)
-    {
-        t = Mth.clamp(t, 0.0F, 1.0F);
-        int r = (int) Mth.lerp(t, (from >> 16) & 0xFF, (to >> 16) & 0xFF);
-        int g = (int) Mth.lerp(t, (from >> 8) & 0xFF, (to >> 8) & 0xFF);
-        int b = (int) Mth.lerp(t, from & 0xFF, to & 0xFF);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
-    }
-
-    private static int brighten(int color, float amount)
-    {
-        int r = Math.min(255, (int) (((color >> 16) & 0xFF) * (1.0F + amount)) + 30);
-        int g = Math.min(255, (int) (((color >> 8) & 0xFF) * (1.0F + amount)) + 30);
-        int b = Math.min(255, (int) ((color & 0xFF) * (1.0F + amount)) + 30);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
-    }
-
-    private static int darken(int color, float amount)
-    {
-        int r = (int) (((color >> 16) & 0xFF) * (1.0F - amount));
-        int g = (int) (((color >> 8) & 0xFF) * (1.0F - amount));
-        int b = (int) ((color & 0xFF) * (1.0F - amount));
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
+        return Argb.lerpRgb((tension - 0.5F) * 2.0F, 0xFFE8C33A, 0xFFE03434);
     }
 }

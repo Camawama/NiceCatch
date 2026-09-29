@@ -1,5 +1,6 @@
 package net.camacraft.nicecatch.server.goal;
 
+import net.camacraft.camafy.compat.gravity.Gravity;
 import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.server.FishBehavior;
 import net.camacraft.nicecatch.server.FishProfiles;
@@ -46,6 +47,8 @@ public class FishJumpGoal extends Goal
         // A leisurely roll roughly every two seconds per fish, staggered.
         if ((fish.tickCount + fish.getId()) % 40 != 0) return false;
         if (fish.getRandom().nextFloat() >= chance) return false;
+        // A leap needs gravity to bring the fish back: without it, it would leave the water for good.
+        if (Gravity.ambientStrength(fish) < Gravity.WEIGHTLESS_BELOW) return false;
 
         // Near the surface with open air above it — no leaping at a ceiling of ice.
         BlockPos pos = fish.blockPosition();
@@ -68,10 +71,12 @@ public class FishJumpGoal extends Goal
         } else {
             heading = fish.getRandom().nextDouble() * Math.PI * 2.0D;
         }
+        // the same arc in low gravity: height and length go as speed squared over gravity
+        double k = Math.sqrt(Math.min(1.0D, Gravity.ambientStrength(fish)));
         fish.setDeltaMovement(
-                v.x - Math.sin(heading) * 0.22D,
-                0.46D + fish.getRandom().nextDouble() * 0.18D,
-                v.z + Math.cos(heading) * 0.22D);
+                v.x - Math.sin(heading) * 0.22D * k,
+                (0.46D + fish.getRandom().nextDouble() * 0.18D) * k,
+                v.z + Math.cos(heading) * 0.22D * k);
         fish.setYRot((float) Math.toDegrees(heading));
         fish.yBodyRot = fish.getYRot();
         fish.hurtMarked = true; // the leap must reach clients whole, not as a stutter

@@ -1,5 +1,9 @@
 package net.camacraft.nicecatch.server;
 
+import net.camacraft.camafy.compat.gravity.Gravity;
+import net.camacraft.camafy.data.PlayerSessions;
+import net.camacraft.camafy.minigame.MatchPolicies;
+import net.camacraft.camafy.network.NetValidate;
 import net.camacraft.nicecatch.FightPhase;
 import net.camacraft.nicecatch.NiceCatch;
 import net.camacraft.nicecatch.NiceCatchConfig;
@@ -48,7 +52,6 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.ItemFishedEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
@@ -56,7 +59,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -64,7 +66,11 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = NiceCatch.MODID)
 public class ServerFishingManager
 {
-    private static final Map<UUID, Session> SESSIONS = new HashMap<>();
+    /**
+     * Kept through the logout event so onLogout can still unhook the player's fish (it removes the
+     * session itself); PlayerSessions clears whatever is left when the server stops.
+     */
+    private static final PlayerSessions<Session> SESSIONS = PlayerSessions.createKeptOnLogout(id -> new Session());
     private static final TagKey<Item> FORGE_RAW_FISHES =
             ItemTags.create(ResourceLocation.fromNamespaceAndPath("forge", "raw_fishes"));
 
@@ -111,21 +117,32 @@ public class ServerFishingManager
 
     private static Session session(Player player)
     {
-        return SESSIONS.computeIfAbsent(player.getUUID(), uuid -> new Session());
+        return SESSIONS.get(player);
     }
 
     /** Used by FishBehavior: a bobber whose owner is mid-fight stops attracting new fish. */
     public static boolean isFighting(ServerPlayer player)
     {
-        Session session = SESSIONS.get(player.getUUID());
+        Session session = SESSIONS.peek(player);
         return session != null && session.fight != null;
     }
 
     /** A bobber whose owner is fighting a fish OR reeling the line in stops attracting fish. */
     public static boolean isBusy(ServerPlayer player)
     {
-        Session session = SESSIONS.get(player.getUUID());
+        Session session = SESSIONS.peek(player);
         return session != null && (session.fight != null || session.retrieve != null);
+    }
+
+    /**
+     * Whether {@code owner}'s line may hook (and drag) {@code target}. Another player is only
+     * fair game where the minigame host allows harming them right now (Camafy MatchPolicies:
+     * pvp off, a grace period, a safe region, a teammate); anything else always is. Server-side.
+     */
+    public static boolean mayHook(@Nullable Entity owner, Entity target)
+    {
+        return !(target instanceof Player) || owner == null || owner == target
+                || MatchPolicies.canHarm(owner, target);
     }
 
     /**
@@ -149,17 +166,11 @@ public class ServerFishingManager
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event)
     {
-        Session session = SESSIONS.remove(event.getEntity().getUUID());
+        Session session = SESSIONS.remove(event.getEntity());
         if (session != null && event.getEntity() instanceof ServerPlayer player) {
             unhookFish(player.serverLevel(), session.fight);
             clearBiteFlow(player.serverLevel(), session);
         }
-    }
-
-    @SubscribeEvent
-    public static void onServerStopped(ServerStoppedEvent event)
-    {
-        SESSIONS.clear();
     }
 
     /**
@@ -196,13 +207,17 @@ public class ServerFishingManager
 
         Player owner = hook.getPlayerOwner();
         if (owner == null) return;
-        Session session = SESSIONS.get(owner.getUUID());
+        Session session = SESSIONS.peek(owner);
         if (session == null || session.pendingCastMultiplier <= 0) return;
 
         double m = session.pendingCastMultiplier;
         session.pendingCastMultiplier = -1.0D;
         Vec3 v = hook.getDeltaMovement();
-        hook.setDeltaMovement(v.x * m, v.y * Math.sqrt(m), v.z * m);
+        // The gentler vertical scaling keeps a weak cast's arc landing near the aim under
+        // gravity; with none (VS Genesis's space, an Ad Astra orbit) there is no arc, and the
+        // cast flies straight along the aim at every strength.
+        double my = Gravity.ambientStrength(hook) < Gravity.WEIGHTLESS_BELOW ? m : Math.sqrt(m);
+        hook.setDeltaMovement(v.x * m, v.y * my, v.z * m);
     }
 
     /**
@@ -249,7 +264,16 @@ public class ServerFishingManager
         LootTable table = level.getServer().getLootData().getLootTable(tableId);
         List<ItemStack> drops = table.getRandomItems(params);
 
+        // Vanilla's toss is a lob the ground catches near the angler. With no gravity it would
+        // sail on past them for good, so there the catch is handed over where they stand.
+        boolean weightless = Gravity.ambientStrength(hook) < Gravity.WEIGHTLESS_BELOW;
         for (ItemStack drop : drops) {
+            if (weightless) {
+                ItemEntity item = new ItemEntity(level, player.getX(), player.getY() + 0.5D, player.getZ(), drop, 0.0D, 0.0D, 0.0D);
+                item.setNoPickUpDelay();
+                level.addFreshEntity(item);
+                continue;
+            }
             ItemEntity item = new ItemEntity(level, hook.getX(), hook.getY(), hook.getZ(), drop);
             double dx = player.getX() - hook.getX();
             double dy = player.getY() - hook.getY();
@@ -271,7 +295,7 @@ public class ServerFishingManager
         }
 
         NiceCatchConfig.Server cfg = NiceCatchConfig.SERVER;
-        power = Mth.clamp(power, 0.0F, 1.0F);
+        power = NetValidate.finiteClamp(power, 0.0F, 1.0F);
         double multiplier = Mth.lerp(power, cfg.castPowerMin.get(), cfg.castPowerMax.get());
         // Long Cast: the whole throw flies harder, level by level.
         multiplier *= 1.0D + 0.15D * net.camacraft.nicecatch.registry.ModEnchantments.level(
@@ -398,7 +422,7 @@ public class ServerFishingManager
         NiceCatchNet.sendTo(player, new ArrowFightMessage(fish.getId()));
         // Spectators get the line too — a rod fight's bobber is synced to everyone, but an
         // arrow fight has no entity to carry that information.
-        NiceCatchNet.sendToTracking(fish, new net.camacraft.nicecatch.network.ArrowLineMessage(
+        NiceCatchNet.sendToTrackingAndSelf(fish, new net.camacraft.nicecatch.network.ArrowLineMessage(
                 player.getId(), fish.getId(), true));
         return true;
     }
@@ -508,20 +532,21 @@ public class ServerFishingManager
     public static void onReelInput(ServerPlayer player, float crank, float lift, float side,
                                    float feed, boolean holding)
     {
-        Session session = SESSIONS.get(player.getUUID());
+        Session session = SESSIONS.peek(player);
         if (session != null && session.fight != null) {
+            // Client floats: a non-finite value counts as no input.
             FishFight fight = session.fight;
-            fight.pendingCrank += Mth.clamp(crank, 0.0F, 0.5F);
-            fight.pendingLift += Mth.clamp(lift, 0.0F, 2.0F);
-            fight.pendingSide = Mth.clamp(fight.pendingSide + Mth.clamp(side, -1.5F, 1.5F), -3.0F, 3.0F);
-            fight.pendingFeed = Math.min(fight.pendingFeed + Mth.clamp(feed, 0.0F, 6.0F), 6.0F);
+            fight.pendingCrank += NetValidate.finiteClamp(crank, 0.0F, 0.5F);
+            fight.pendingLift += NetValidate.finiteClamp(lift, 0.0F, 2.0F);
+            fight.pendingSide = Mth.clamp(fight.pendingSide + NetValidate.finiteClamp(side, -1.5F, 1.5F), -3.0F, 3.0F);
+            fight.pendingFeed = Math.min(fight.pendingFeed + NetValidate.finiteClamp(feed, 0.0F, 6.0F), 6.0F);
             fight.holding = holding;
             return;
         }
 
         // No fight on the line: this is a reel-in of an empty hook or a snagged loot item.
         if (!NiceCatchConfig.SERVER.gradualReelEnabled.get()) return;
-        handleRetrieveInput(player, session(player), crank, holding);
+        handleRetrieveInput(player, session(player), NetValidate.finiteOr(crank, 0.0F), holding);
     }
 
     /** Drives (and starts/finishes) a fishless reel-in from the player's per-tick reel input. */
@@ -565,6 +590,13 @@ public class ServerFishingManager
         // bobber achieves nothing — the entity itself must be dragged toward the player.
         Entity snagged = hook.getHookedIn();
         if (snagged != null) {
+            // A player the host protects right now can't be dragged: the line comes home
+            // empty on the spot (the vanilla retrieve lets go of them too, FishingHookMixin).
+            if (!mayHook(player, snagged)) {
+                r.item = false;
+                completeRetrieve(player, session, r);
+                return;
+            }
             if (pullSnaggedEntity(player, snagged, r, crank)) {
                 completeRetrieve(player, session, r);
             }
@@ -616,20 +648,25 @@ public class ServerFishingManager
         Vec3 dir = to.scale(1.0D / dist);
         Vec3 v = snagged.getDeltaMovement();
         boolean grounded = snagged.onGround();
+        // The hops and the climb floor below are sized against ordinary gravity: in low gravity
+        // the same height takes less (a hop scales by its square root), and in none nothing has
+        // to be beaten at all (VS Genesis's space, an Ad Astra orbit).
+        double gravity = Math.min(1.0D, Gravity.strength(snagged));
+        double hop = Math.sqrt(gravity);
         Vec3 add = dir.scale(target * (grounded ? 0.9D : 0.5D));
         if (grounded && to.horizontalDistanceSqr() > 1.0D) {
-            add = new Vec3(add.x, Math.max(add.y, 0.18D), add.z);
+            add = new Vec3(add.x, Math.max(add.y, 0.18D * hop), add.z);
         }
         // Grinding against a ledge: hop it like a mob jumping a block, or the drag stalls
         // there forever with the bobber pinned against the edge.
         if (grounded && snagged.horizontalCollision) {
-            add = new Vec3(add.x, Math.max(add.y, 0.45D), add.z);
+            add = new Vec3(add.x, Math.max(add.y, 0.45D * hop), add.z);
         }
         v = v.add(add);
         // Reeling from above (an elevated or flying angler): the winch must actually beat
         // gravity, or "up" simply never happens — hold the climb at gravity-plus-reel-speed.
         if (dir.y > 0.2D) {
-            v = new Vec3(v.x, Math.max(v.y, 0.085D + target * dir.y), v.z);
+            v = new Vec3(v.x, Math.max(v.y, 0.085D * gravity + target * dir.y), v.z);
         }
         double cap = Math.max(target * 1.5D, 0.25D);
         double horiz = v.horizontalDistance();
@@ -714,7 +751,7 @@ public class ServerFishingManager
         if (event.phase != TickEvent.Phase.END || event.side != LogicalSide.SERVER) return;
         if (!(event.player instanceof ServerPlayer player)) return;
 
-        Session session = SESSIONS.get(player.getUUID());
+        Session session = SESSIONS.peek(player);
         FishingHook hook = player.fishing;
 
         // A line-arrow fight has no bobber, so it must be ticked independently of player.fishing
@@ -1584,7 +1621,9 @@ public class ServerFishingManager
         double dx = player.getX() - fish.getX();
         double dy = player.getY() - fish.getY();
         double dz = player.getZ() - fish.getZ();
-        fish.setDeltaMovement(dx * 0.1D, dy * 0.1D + Math.sqrt(Math.sqrt(dx * dx + dy * dy + dz * dz)) * 0.12D, dz * 0.1D);
+        // (the lob that gravity brings back down: none without gravity, less of it on the Moon)
+        double lob = Math.min(1.0D, Gravity.ambientStrength(fish));
+        fish.setDeltaMovement(dx * 0.1D, dy * 0.1D + Math.sqrt(Math.sqrt(dx * dx + dy * dy + dz * dz)) * 0.12D * lob, dz * 0.1D);
         fish.hurtMarked = true; // force a velocity sync so the leap is visible
 
         // Keep the AI suppressed for the flight; the conversion discards the entity. An arrow-
@@ -1932,7 +1971,7 @@ public class ServerFishingManager
         if (fight != null && fight.arrow) {
             PathfinderMob fish = resolveFish(player.serverLevel(), fight.fishId);
             if (fish != null) {
-                NiceCatchNet.sendToTracking(fish, new net.camacraft.nicecatch.network.ArrowLineMessage(
+                NiceCatchNet.sendToTrackingAndSelf(fish, new net.camacraft.nicecatch.network.ArrowLineMessage(
                         player.getId(), fish.getId(), false));
             }
         }
@@ -1947,7 +1986,7 @@ public class ServerFishingManager
     public static boolean netLandHookedFish(ServerPlayer netter, PathfinderMob fish)
     {
         var server = netter.serverLevel().getServer();
-        for (Map.Entry<UUID, Session> entry : SESSIONS.entrySet()) {
+        for (Map.Entry<UUID, Session> entry : SESSIONS.view().entrySet()) {
             Session session = entry.getValue();
             FishFight fight = session.fight;
             if (fight == null || !fish.getUUID().equals(fight.fishId)) continue;

@@ -3,6 +3,7 @@ package net.camacraft.nicecatch.mixin;
 import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.RodUtil;
 import net.camacraft.nicecatch.server.FishBehavior;
+import net.camacraft.nicecatch.server.ServerFishingManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -80,6 +81,13 @@ public abstract class FishingHookMixin
 
         // Hooked-player escape.
         if (self.hookedIn instanceof ServerPlayer hooked && self.getPlayerOwner() != hooked) {
+            // The host stopped allowing it (a grace period began, they reached a safe region):
+            // the line gives, exactly like a successful escape, so nobody is held against the rules.
+            if (!ServerFishingManager.mayHook(self.getPlayerOwner(), hooked)) {
+                self.discard();
+                ci.cancel();
+                return;
+            }
             int need = NiceCatchConfig.SERVER.playerEscapeCrouchTicks.get();
             if (need > 0) {
                 if (--nicecatch$warnCooldown <= 0) {
@@ -239,6 +247,37 @@ public abstract class FishingHookMixin
                 && mob.isInWater()
                 && net.camacraft.nicecatch.server.FishBehavior.isFishLike(mob)) {
             cir.setReturnValue(false);
+        }
+    }
+
+    /**
+     * A cast passes through a player the minigame host protects right now (pvp off, a grace
+     * period, a safe region, a teammate) instead of hooking them. Server-side: the hook only
+     * ever attaches there, and the host's rules live on the server thread.
+     */
+    @Inject(method = "canHitEntity", at = @At("HEAD"), cancellable = true)
+    private void nicecatch$noHookingProtectedPlayers(net.minecraft.world.entity.Entity target,
+                                                     CallbackInfoReturnable<Boolean> cir)
+    {
+        FishingHook self = (FishingHook) (Object) this;
+        if (!self.level().isClientSide && !ServerFishingManager.mayHook(self.getOwner(), target)) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    /**
+     * Vanilla's retrieve yanks a hooked entity toward the angler — for a player that tug runs on
+     * THEIR client (entity event 31). A player the host protects right now is let go first, so
+     * the line reels in empty and no tug is sent.
+     */
+    @Inject(method = "retrieve", at = @At("HEAD"))
+    private void nicecatch$releaseProtectedPlayer(net.minecraft.world.item.ItemStack stack,
+                                                  CallbackInfoReturnable<Integer> cir)
+    {
+        FishingHook self = (FishingHook) (Object) this;
+        if (!self.level().isClientSide && self.hookedIn != null
+                && !ServerFishingManager.mayHook(self.getPlayerOwner(), self.hookedIn)) {
+            self.setHookedEntity(null);
         }
     }
 

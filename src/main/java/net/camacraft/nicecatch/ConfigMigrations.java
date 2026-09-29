@@ -1,9 +1,7 @@
 package net.camacraft.nicecatch;
 
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.camacraft.camafy.config.ConfigMigrator;
+import net.minecraftforge.eventbus.api.IEventBus;
 
 /**
  * Kills the oldest foot-gun in the project: Forge server configs live per-world, and an
@@ -12,46 +10,28 @@ import net.minecraftforge.fml.event.config.ModConfigEvent;
  * hand-edited a toml. Now each config file carries a version stamp; when a file from an
  * older generation loads, any value STILL SITTING ON ITS OLD DEFAULT is moved to the new
  * one. A value the user customized never matches the old default, so it is never touched.
+ * (Camafy's ConfigMigrator does the loading, the check and the stamp; this is just the table.)
  */
-@Mod.EventBusSubscriber(modid = NiceCatch.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class ConfigMigrations
 {
     private ConfigMigrations() {}
 
-    @SubscribeEvent
-    public static void onConfigLoad(ModConfigEvent.Loading event)
+    public static void register(IEventBus modBus)
     {
-        if (event.getConfig().getSpec() != NiceCatchConfig.SERVER_SPEC) return;
         NiceCatchConfig.Server cfg = NiceCatchConfig.SERVER;
-        int version = cfg.configVersion.get();
-        if (version >= NiceCatchConfig.Server.CURRENT_CONFIG_VERSION) return;
-
-        if (version < 2) {
-            // Every default retuned since these keys first shipped.
-            migrate(cfg.biteChancePerSecond, 0.10D, 0.22D);
-            migrate(cfg.scatterOnHookChance, 0.35D, 0.2D);
-            migrate(cfg.dartWindowTicks, 25, 35);
-            migrate(cfg.netCooldownTicks, 40, 60);
-            migrate(cfg.schoolSpawnWeightMultiplier, 1.0D, 2.5D);
-            migrate(cfg.soundPhaseMinWeightLbs, 25.0D, 5.0D);
-            migrate(cfg.tensionPerRevolutionRun, 0.30D, 0.24D);
-            migrate(cfg.tensionRecoveryPerTick, 0.012D, 0.016D);
-        }
-
-        cfg.configVersion.set(NiceCatchConfig.Server.CURRENT_CONFIG_VERSION);
-    }
-
-    private static void migrate(ForgeConfigSpec.DoubleValue value, double oldDefault, double newDefault)
-    {
-        if (Math.abs(value.get() - oldDefault) < 1.0E-9D) {
-            value.set(newDefault);
-        }
-    }
-
-    private static void migrate(ForgeConfigSpec.IntValue value, int oldDefault, int newDefault)
-    {
-        if (value.get() == oldDefault) {
-            value.set(newDefault);
-        }
+        ConfigMigrator.register(modBus, NiceCatchConfig.SERVER_SPEC, cfg.configVersion,
+                NiceCatchConfig.Server.CURRENT_CONFIG_VERSION, version -> {
+                    if (version < 2) {
+                        // Every default retuned since these keys first shipped.
+                        ConfigMigrator.move(cfg.biteChancePerSecond, 0.10D, 0.22D);
+                        ConfigMigrator.move(cfg.scatterOnHookChance, 0.35D, 0.2D);
+                        ConfigMigrator.move(cfg.dartWindowTicks, 25, 35);
+                        ConfigMigrator.move(cfg.netCooldownTicks, 40, 60);
+                        ConfigMigrator.move(cfg.schoolSpawnWeightMultiplier, 1.0D, 2.5D);
+                        ConfigMigrator.move(cfg.soundPhaseMinWeightLbs, 25.0D, 5.0D);
+                        ConfigMigrator.move(cfg.tensionPerRevolutionRun, 0.30D, 0.24D);
+                        ConfigMigrator.move(cfg.tensionRecoveryPerTick, 0.012D, 0.016D);
+                    }
+                });
     }
 }

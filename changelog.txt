@@ -5,6 +5,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (zero and low gravity: VS Genesis, Ad Astra)
+- Casts fly straight along the aim where there is no gravity (the gentler vertical scaling only kept a weak
+  cast's arc on target under gravity). Loot there is handed over at the angler's feet instead of lobbed past
+  them for good, a landed fish is thrown without the lob, and fish don't leap out of the water (nothing would
+  bring them back). On the Moon a leap reaches the same height as on Earth.
+- Reeling a snagged mob or item beats the local gravity, not Earth's: no rocketing upward in space, and hops
+  over ledges reach the same height at any gravity. The line-arrow fight line sags by the local gravity.
+- Needs Camafy 0.1.7.
+
+### Changed (modpack compatibility)
+- **Cut the Line defaults to Z** (was V, which Grapple Unbound's hook config and Full Stop's
+  F3+V also use). A key you already chose is kept.
+- **Players are only hooked where the rules allow it.** With a minigame host installed
+  (Camafy match policy: pvp off, grace periods, safe regions, teammates), a cast passes
+  through a protected player, and one who becomes protected while hooked slips free —
+  never reeled, dragged or tugged.
+- **The follow-fish camera aims in the angler's own gravity frame**, so it tracks the fish
+  under a gravity mod too.
+- Requires Camafy 0.1.1.
+
+### Changed (the tank is real now)
+- **Fish tanks hold REAL water and REAL fish.** A filled tank block genuinely contains a
+  water source; its collision is only the outer glass walls (open toward adjoining
+  tanks), so the whole structure is one swimmable pool — and the fish inside is a genuine
+  entity swimming its genuine AI: natural motion, the pitch animation, true size, correct
+  tropical patterns, vanilla biome-tinted water rendering, everything, because none of it
+  is faked anymore. Scoop the fish back out with an empty hand (snapshot intact). Tanks
+  cast no shadows (glass optics), and buckets fill the STRUCTURE from the bottom up, one
+  block of water per bucket. A tank must actually fit its fish — a trophy tuna needs a
+  trophy aquarium.
+- **Caught fish items carry their full entity snapshot** now (the fish's actual NBT,
+  pattern and all). That snapshot IS the "still alive" marker: only snapshot-carrying
+  catches, fish buckets, and fish spawn eggs can stock a tank — a plain loot-table fillet
+  is dinner, not a pet. It also means every caught tropical fish finally shows ITS OWN
+  colors when held.
+- **Rod stand bell rings high and small**, like the tiny bell it is.
+
 ### Fixed (polish round 2)
 - **Parked rods show their CAST texture** (line-out model), resolved through the rod's own
   item override so modded rods' cast models work too.

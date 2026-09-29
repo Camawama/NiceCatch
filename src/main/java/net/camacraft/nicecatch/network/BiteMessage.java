@@ -1,9 +1,8 @@
 package net.camacraft.nicecatch.network;
 
+import net.camacraft.camafy.network.Packets;
 import net.camacraft.nicecatch.client.ClientFishing;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -41,8 +40,6 @@ public class BiteMessage
 
     public static void handle(BiteMessage msg, Supplier<NetworkEvent.Context> ctx)
     {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientFishing.handleBite(msg.biting, msg.entity, msg.direction)));
-        ctx.get().setPacketHandled(true);
+        Packets.handleClient(ctx, () -> () -> ClientFishing.handleBite(msg.biting, msg.entity, msg.direction));
     }
 }
