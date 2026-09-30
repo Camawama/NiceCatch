@@ -1,5 +1,6 @@
 package net.camacraft.nicecatch.server;
 
+import net.camacraft.camafy.charge.AimScatter;
 import net.camacraft.camafy.compat.gravity.Gravity;
 import net.camacraft.camafy.data.PlayerSessions;
 import net.camacraft.camafy.minigame.MatchPolicies;
@@ -78,6 +79,8 @@ public class ServerFishingManager
     {
         boolean dispatchingUse;
         double pendingCastMultiplier = -1.0D;
+        /** How far (degrees, at most) the cast being dispatched may wander off the aim: it was held too long. */
+        double pendingCastWander;
         boolean prevBite;
         boolean prevBiteEntity;
         float biteCarry;
@@ -212,7 +215,9 @@ public class ServerFishingManager
 
         double m = session.pendingCastMultiplier;
         session.pendingCastMultiplier = -1.0D;
-        Vec3 v = hook.getDeltaMovement();
+        // A cast held past its steady window trembles off the aim (Camafy's shared aim scatter).
+        Vec3 v = AimScatter.scatterVelocity(hook.getDeltaMovement(), owner.getRandom(), session.pendingCastWander);
+        session.pendingCastWander = 0.0D;
         // The gentler vertical scaling keeps a weak cast's arc landing near the aim under
         // gravity; with none (VS Genesis's space, an Ad Astra orbit) there is no arc, and the
         // cast flies straight along the aim at every strength.
@@ -285,7 +290,10 @@ public class ServerFishingManager
                 level.random.nextInt(6) + 1));
     }
 
-    public static void onCast(ServerPlayer player, float power, InteractionHand hand)
+    /** Longest hold a cast message may claim (ten minutes); anything past castShakyTicks is fully strained anyway. */
+    private static final int MAX_CAST_HOLD_TICKS = 12000;
+
+    public static void onCast(ServerPlayer player, float power, InteractionHand hand, int holdTicks)
     {
         if (player.fishing != null || player.isSpectator()) return;
         if (isBusy(player)) return; // e.g. mid line-arrow fight (no bobber out, but still fighting)
@@ -301,8 +309,15 @@ public class ServerFishingManager
         multiplier *= 1.0D + 0.15D * net.camacraft.nicecatch.registry.ModEnchantments.level(
                 player.getItemInHand(hand), net.camacraft.nicecatch.registry.ModEnchantments.LONG_CAST);
 
+        // Steady at first; a cast held past castSteadyTicks trembles, and wanders off the aim by up
+        // to castMaxWanderDegrees at castShakyTicks (Camafy's shared hold strain, as the client's
+        // rod showed it). The hold time is the client's, like the power.
+        int held = Mth.clamp(holdTicks, 0, MAX_CAST_HOLD_TICKS);
+        double wander = RodUtil.castStrain(held) * cfg.castMaxWanderDegrees.get();
+
         Session session = session(player);
         session.pendingCastMultiplier = multiplier;
+        session.pendingCastWander = wander;
         session.dispatchingUse = true;
         try {
             InteractionResult result = player.gameMode.useItem(player, player.serverLevel(), player.getItemInHand(hand), hand);
@@ -312,6 +327,7 @@ public class ServerFishingManager
         } finally {
             session.dispatchingUse = false;
             session.pendingCastMultiplier = -1.0D;
+            session.pendingCastWander = 0.0D;
         }
     }
 

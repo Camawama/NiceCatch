@@ -2,11 +2,14 @@ package net.camacraft.nicecatch.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import net.camacraft.camafy.client.charge.HandTremor;
 import net.camacraft.nicecatch.NiceCatch;
 import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.RodUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -14,8 +17,9 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * First-person rod animation: extra pose applied to the rod hand before vanilla renders it,
- * driven entirely by what the fishing state machine is doing — the rod cocks back and
- * trembles with the charge bar, whips forward on release, twitches with a bite, and during
+ * driven entirely by what the fishing state machine is doing — the rod cocks back with the
+ * charge bar (steady at first, trembling once the cast has been held too long), whips forward
+ * on release, twitches with a bite, and during
  * the fight it bends with line tension, judders through runs, rises as you lift, and wobbles
  * in a little circle with your actual crank input. Simple rotations and slides, but the rod
  * finally feels held rather than glued to the screen.
@@ -51,12 +55,18 @@ public final class RodHandAnimator
 
         switch (ClientFishing.phase()) {
             case CHARGING -> {
-                // Raised and cocked back over the shoulder, rising with the power bar,
-                // with a keen tremble.
+                // Raised and cocked back over the shoulder, rising with the power bar. Steady at
+                // first; held too long, the rod starts to tremble, more and more (Camafy's hold
+                // tremor, on the same strain the server lets the cast wander by).
                 float c = ClientFishing.chargeValue(pt);
                 pose.translate(0.0D, 0.03D * c, 0.08D * c);
-                pose.mulPose(Axis.XP.rotationDegrees(24.0F * c + Mth.sin(t * 1.6F) * 1.5F * c));
-                pose.mulPose(Axis.ZP.rotationDegrees(Mth.sin(t * 1.1F) * 1.2F * c));
+                pose.mulPose(Axis.XP.rotationDegrees(24.0F * c));
+                float tremble = ClientFishing.castStrain(pt) * NiceCatchConfig.CLIENT.castTremble.get().floatValue();
+                if (tremble > 0.0F) {
+                    HumanoidArm arm = event.getHand() == InteractionHand.MAIN_HAND
+                            ? mc.player.getMainArm() : mc.player.getMainArm().getOpposite();
+                    HandTremor.apply(pose, tremble, ClientFishing.chargeTicks() + pt, arm);
+                }
             }
             case BITE -> {
                 // The tip jerks with the fish worrying the bait.

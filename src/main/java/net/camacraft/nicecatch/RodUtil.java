@@ -1,5 +1,6 @@
 package net.camacraft.nicecatch;
 
+import net.camacraft.camafy.charge.HoldStrain;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -79,6 +80,18 @@ public class RodUtil
         double cos = Math.cos(radians);
         double sin = Math.sin(radians);
         return new Vec3(v.x * cos - v.z * sin, v.y, v.x * sin + v.z * cos);
+    }
+
+    /**
+     * How unsteady a cast held for {@code holdTicks} has become: 0 while it is fresh, rising to 1
+     * once it has been held too long (Camafy's shared hold strain, on the server config's
+     * castSteadyTicks / castShakyTicks, which clients get synced). The rod trembles by it on the
+     * client and the cast wanders by it on the server.
+     */
+    public static float castStrain(double holdTicks)
+    {
+        return HoldStrain.at(holdTicks, NiceCatchConfig.SERVER.castSteadyTicks.get(),
+                NiceCatchConfig.SERVER.castShakyTicks.get());
     }
 
     /** True for the vanilla rod and any modded rod that declares the fishing-cast tool action (Aquaculture etc.). */

@@ -29,6 +29,9 @@ public class NiceCatchConfig
 
         public final ForgeConfigSpec.DoubleValue castPowerMin;
         public final ForgeConfigSpec.DoubleValue castPowerMax;
+        public final ForgeConfigSpec.IntValue castSteadyTicks;
+        public final ForgeConfigSpec.IntValue castShakyTicks;
+        public final ForgeConfigSpec.DoubleValue castMaxWanderDegrees;
         public final ForgeConfigSpec.DoubleValue biteWindowMultiplier;
         public final ForgeConfigSpec.DoubleValue runReelEffectiveness;
         public final ForgeConfigSpec.DoubleValue liftRunResistance;
@@ -224,6 +227,12 @@ public class NiceCatchConfig
                     .defineInRange("castPowerMin", 0.30D, 0.05D, 1.0D);
             castPowerMax = b.comment("Velocity multiplier of a fully charged cast, relative to vanilla.")
                     .defineInRange("castPowerMax", 1.65D, 1.0D, 3.0D);
+            castSteadyTicks = b.comment("Ticks a cast can be held before the rod starts to tremble. Until then the cast goes exactly where you aim. (Camafy's shared hold strain, the same one Better Toss's throws use.)")
+                    .defineInRange("castSteadyTicks", 40, 0, 1200);
+            castShakyTicks = b.comment("Ticks of holding at which the rod's tremble and the cast's wander are at their fullest (they build up smoothly from castSteadyTicks).")
+                    .defineInRange("castShakyTicks", 100, 1, 2400);
+            castMaxWanderDegrees = b.comment("How far (degrees, at most, in a random direction) a cast held until castShakyTicks wanders off the aim; less for a shorter hold. 0 keeps every cast on target (the rod still trembles).")
+                    .defineInRange("castMaxWanderDegrees", 6.0D, 0.0D, 45.0D);
             b.pop();
 
             b.push("bite");
@@ -664,6 +673,7 @@ public class NiceCatchConfig
         public final ForgeConfigSpec.DoubleValue hookSetJoltDegrees;
         public final ForgeConfigSpec.BooleanValue fishPitchEnabled;
         public final ForgeConfigSpec.BooleanValue rodAnimationsEnabled;
+        public final ForgeConfigSpec.DoubleValue castTremble;
         public final ForgeConfigSpec.BooleanValue fishCarryEnabled;
         public final ForgeConfigSpec.DoubleValue scrollReelPerNotch;
 
@@ -701,6 +711,8 @@ public class NiceCatchConfig
                     .define("fishPitchEnabled", true);
             rodAnimationsEnabled = b.comment("First-person rod animations: draw-back while charging a cast, the cast whip, bite twitches, and strain/shake/lift/crank motion during the fight.")
                     .define("rodAnimationsEnabled", true);
+            castTremble = b.comment("How much the rod trembles once a cast has been held too long (first person, with rodAnimationsEnabled). The rod is steady at first; when it starts and when it is at its shakiest are the server's castSteadyTicks and castShakyTicks. 1 is the intended look, 0 turns it off.")
+                    .defineInRange("castTremble", 1.0D, 0.0D, 3.0D);
             fishCarryEnabled = b.comment("First-person fish carrying: a light fish held in one hand dangles by the tail; a heavy one (8+ lbs) is hefted low with both hands.")
                     .define("fishCarryEnabled", true);
             scrollReelPerNotch = b.comment("Crank revolutions added per scroll-wheel notch while working the reel (scroll DOWN = wind line in, scroll UP = deliberately pay line out, easing tension at the cost of ground — matching a real reel handle's motion). 0 disables scroll controls entirely.")

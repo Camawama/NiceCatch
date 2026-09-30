@@ -1,6 +1,7 @@
 package net.camacraft.nicecatch.client;
 
 import net.camacraft.camafy.client.anim.Blink;
+import net.camacraft.camafy.client.charge.ChargeBar;
 import net.camacraft.camafy.client.gui.hud.HudBar;
 import net.camacraft.camafy.client.gui.hud.HudHint;
 import net.camacraft.camafy.client.gui.hud.XpBarSlot;
@@ -49,7 +50,8 @@ public class FishingBarOverlay
     {
         switch (ClientFishing.phase()) {
             case CHARGING -> {
-                HudBar.draw(graphics, x, y, ClientFishing.chargeValue(partialTick), 0xFF3CB4E7, HudBar.Style.XP_BEVEL);
+                // Camafy's shared charge bar: the same sweep and look as Better Toss's throws.
+                ChargeBar.draw(graphics, x, y, ClientFishing.chargeValue(partialTick), 0xFF3CB4E7);
                 drawHint(graphics, "nicecatch.hint.charge", 0xFF9BDCF5, false);
             }
             case BITE -> {

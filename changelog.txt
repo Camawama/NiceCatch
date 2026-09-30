@@ -5,6 +5,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (a cast held too long gets shaky)
+- **The rod is steady at first and trembles the longer you hold a cast**, like a spear held
+  out too long: nothing for the first two seconds (so the bar's first sweep to full is a clean
+  cast), then a tremble that builds until it is clearly shaky at five. It replaces the old
+  "keen tremble", which just followed the power bar up and down. Client `castTremble` (1; 0
+  turns it off) sets how much the rod shakes.
+- **A cast held that long wanders off the aim:** up to 6° in a random direction at full
+  tremble, less before (server `casting.castSteadyTicks` 40, `castShakyTicks` 100,
+  `castMaxWanderDegrees` 6). The client reports the hold time with the cast, so the network
+  protocol is now "3": server and client need the same Nice Catch jar.
+- **One charge mechanic with Better Toss:** the sweeping cast bar, the rod's tremble and the
+  wander are Camafy's shared hold-to-charge code (`HoldStrain`, `AimScatter`, `HandTremor`,
+  `ChargeBar`), the same as Better Toss's charged throws. The bar looks and sweeps exactly as
+  before (30 ticks up, 30 down). Needs Camafy 0.1.13.
+
 ### Changed (zero and low gravity: VS Genesis, Ad Astra)
 - Casts fly straight along the aim where there is no gravity (the gentler vertical scaling only kept a weak
   cast's arc on target under gravity). Loot there is handed over at the angler's feet instead of lobbed past

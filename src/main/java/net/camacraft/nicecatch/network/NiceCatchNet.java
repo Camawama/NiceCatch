@@ -7,8 +7,8 @@ import net.minecraft.server.level.ServerPlayer;
 
 public class NiceCatchNet
 {
-    /** Bump whenever any message's wire format changes, so mismatched jars fail fast at login. */
-    private static final String PROTOCOL_VERSION = "2";
+    /** Bump whenever any message's wire format changes, so mismatched jars fail fast at login. (3: CastMessage carries the hold time.) */
+    private static final String PROTOCOL_VERSION = "3";
 
     public static final CamafyChannel CHANNEL = CamafyChannel.create(
             ResourceLocation.fromNamespaceAndPath(NiceCatch.MODID, "main"), PROTOCOL_VERSION);

@@ -1,8 +1,8 @@
 package net.camacraft.nicecatch.client;
 
+import net.camacraft.camafy.client.charge.ChargeBar;
 import net.camacraft.camafy.compat.gravity.Gravity;
 import net.camacraft.camafy.compat.gravity.GravityFrame;
-import net.camacraft.camafy.util.anim.Easing;
 import net.camacraft.nicecatch.FightPhase;
 import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.RodUtil;
@@ -238,12 +238,19 @@ public class ClientFishing
         return crankAngle + crankVel * (float) (Math.PI * 2.0D) * partialTick;
     }
 
-    /** The oscillating cast power bar: sweeps 0 -> 1 -> 0 repeatedly. */
+    /** The oscillating cast power bar: sweeps 0 -> 1 -> 0 repeatedly (Camafy's shared charge bar, as Better Toss's throws). */
     public static float chargeValue(float partialTick)
     {
-        float half = NiceCatchConfig.CLIENT.chargeSweepTicks.get();
-        float t = (chargeTicks + partialTick) / half;
-        return Easing.pingPong(t);
+        return ChargeBar.oscillate(chargeTicks + partialTick, NiceCatchConfig.CLIENT.chargeSweepTicks.get());
+    }
+
+    /**
+     * 0 while the cast is freshly held and steady, rising to 1 once it has been held too long
+     * (the rod trembles by it, and the server lets the cast wander by it). 0 when not charging.
+     */
+    public static float castStrain(float partialTick)
+    {
+        return phase == Phase.CHARGING ? RodUtil.castStrain(chargeTicks + partialTick) : 0.0F;
     }
 
     public static boolean canStartCharge()
@@ -356,7 +363,7 @@ public class ClientFishing
                     break;
                 }
                 if (!RodControls.controlDown(mc)) {
-                    NiceCatchNet.sendToServer(new CastMessage(chargeValue(0.0F), chargeHand));
+                    NiceCatchNet.sendToServer(new CastMessage(chargeValue(0.0F), chargeHand, chargeTicks));
                     phase = Phase.IDLE;
                     castCooldown = 4;
                     castAnimTicks = CAST_ANIM_LENGTH; // the rod whips forward
