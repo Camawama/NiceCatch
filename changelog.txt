@@ -5,6 +5,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (the bobber rides Streams Reflowing's rivers, 2026-10-10)
+- **A cast bobber drifts with the river's current again** (the owner: with Streams Reflowing "when I cast my bobber
+  in the water, it just stays stationary despite being in the flowing river"). Streams Reflowing gives its rivers'
+  current to the water's own flow, but on purpose holds every fishing hook out of the game's fluid push, so the
+  bobber sat still (Dynamic Waters didn't, which is why it drifted there). A settled bobber now eases its sideways
+  speed toward the water's current itself, on both sides like the rest of the bobber, only where the game's own push
+  leaves it alone (no double push in vanilla or Dynamic Waters water); the spool still holds it at the end of the
+  line. Server `line.bobberCurrentDrift` (1.0 m/s for a flow of 1; 0 turns it off). Harness `sr_drift` (Streams
+  Reflowing 2.14.4, a generated world): the bobber went 3.7 blocks downstream in 9.5 s, 0.39 m/s in water whose current
+  along its path averaged 0.37 m/s, 0.99 of the way along the flow, the client's bobber within 0.004 blocks of the
+  server's; with 0 it stayed put.
+
 ### Changed (a cast held too long gets shaky)
 - **The rod is steady at first and trembles the longer you hold a cast**, like a spear held
   out too long: nothing for the first two seconds (so the bar's first sweep to full is a clean

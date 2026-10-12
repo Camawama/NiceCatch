@@ -76,6 +76,7 @@ public class NiceCatchConfig
         // Line & reel-in (no fish on the line)
         public final ForgeConfigSpec.BooleanValue spoolDragEnabled;
         public final ForgeConfigSpec.DoubleValue spoolLength;
+        public final ForgeConfigSpec.DoubleValue bobberCurrentDrift;
         public final ForgeConfigSpec.BooleanValue gradualReelEnabled;
         public final ForgeConfigSpec.DoubleValue emptyReelSpeed;
         public final ForgeConfigSpec.DoubleValue itemReelSpeed;
@@ -310,6 +311,8 @@ public class NiceCatchConfig
                     .define("spoolDragEnabled", true);
             spoolLength = b.comment("Blocks of line on the spool for a cast (no fish) bobber. Walk past this and the bobber gets dragged along at this distance. Keep it under line.rodRangeLimit (where the line gives out entirely).")
                     .defineInRange("spoolLength", 30.0D, 8.0D, 126.0D);
+            bobberCurrentDrift = b.comment("A cast bobber drifts with the current of the water it floats on, at this many m/s for a flow of 1 (0: never). Only where the game's own fluid push leaves the bobber alone: Streams Reflowing holds every bobber still in its rivers, so there the bobber goes the river's way at the river's speed; in vanilla and Dynamic Waters water the game already carries it.")
+                    .defineInRange("bobberCurrentDrift", 1.0D, 0.0D, 10.0D);
             gradualReelEnabled = b.comment("Instead of a right-click instantly retracting the line, hold right-click and reel (circle the mouse) to bring the bobber in — fast on an empty line, a little slower with a loot item on the hook (no chance of the line snapping; only real fish fight). Disable for vanilla instant retrieval.")
                     .define("gradualReelEnabled", true);
             emptyReelSpeed = b.comment("Top speed, in blocks per second, at which you can reel in an empty line (nothing on the hook).")

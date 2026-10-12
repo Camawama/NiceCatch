@@ -132,6 +132,41 @@ public abstract class FishingHookMixin
     }
 
     /**
+     * A settled, fishless bobber drifts with the current of the water it floats on. Streams Reflowing's rivers carry
+     * the current in the water's own flow ({@code FluidState.getFlow}, on both sides) but hold every fishing hook out of
+     * the game's fluid push, so in its rivers the bobber sat still; vanilla's water and Dynamic Waters' rivers push it
+     * themselves (no drift added there: it would double). The horizontal velocity eases toward the current's
+     * ({@code line.bobberCurrentDrift} m/s per unit of flow, made up for the bobbing hook's own damping), on both sides
+     * like the rest of the bobber's physics (the client simulates its own bobber). Runs before the spool drag, so the
+     * end of the line still holds it.
+     */
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void nicecatch$driftInCurrent(CallbackInfo ci)
+    {
+        FishingHook self = (FishingHook) (Object) this;
+        if (self.currentState != FishingHook.FishHookState.BOBBING || self.hookedIn != null) return;
+        if (self.isPushedByFluid()) return;
+        double drift = NiceCatchConfig.SERVER.bobberCurrentDrift.get();
+        if (drift <= 0.0D) return;
+        net.minecraft.world.level.Level level = self.level();
+        net.minecraft.core.BlockPos pos = self.blockPosition();
+        net.minecraft.world.level.material.FluidState fluid = level.getFluidState(pos);
+        if (!fluid.is(net.minecraft.tags.FluidTags.WATER)) {
+            pos = pos.below();
+            fluid = level.getFluidState(pos);
+            if (!fluid.is(net.minecraft.tags.FluidTags.WATER)) return;
+        }
+        Vec3 flow = fluid.getFlow(level, pos);
+        if (flow.x * flow.x + flow.z * flow.z < 1.0E-6D) return;
+        // the bobbing hook keeps 0.9 of its sideways speed when it moves (vanilla's bobbing), then 0.92 after; easing
+        // half way to the target each tick settles at 0.853 of it before the 0.9: aim high by both, so it moves the current's speed
+        double perTick = drift / 20.0D / (0.9D * 0.853D);
+        double tx = flow.x * perTick, tz = flow.z * perTick;
+        Vec3 v = self.getDeltaMovement();
+        self.setDeltaMovement(v.x + (tx - v.x) * 0.5D, v.y, v.z + (tz - v.z) * 0.5D);
+    }
+
+    /**
      * Feature: the reel pays out line as you walk away from a cast bobber, and once you reach
      * the end of the spool it drags the bobber along behind you instead of the line snapping
      * back. Vanilla discards a hook past 32 blocks (the line just retracts); by pulling the
