@@ -4,7 +4,10 @@ import net.camacraft.nicecatch.NiceCatchConfig;
 import net.camacraft.nicecatch.server.FishBehavior;
 import net.camacraft.nicecatch.server.FishConversion;
 import net.camacraft.nicecatch.server.ServerFishingManager;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -16,6 +19,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.animal.Bucketable;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -107,6 +111,7 @@ public class FishingNetItem extends Item
             if (FishBehavior.isHooked(fish) && ServerFishingManager.netLandHookedFish(player, fish)) {
                 // Only a full net costs time: untangling the catch is the cooldown.
                 player.getCooldowns().addCooldown(this, cfg.netCooldownTicks.get());
+                awardTacticalFishing(player, fish);
                 return;
             }
         }
@@ -124,33 +129,10 @@ public class FishingNetItem extends Item
             }
         }
         if (best == null) return;
-
-        // Weight decides the odds — a hand net is a smallfry tool. Under ~2 lbs it's easy
-        // money; every band past that collapses toward "it burst straight out of the mesh",
-        // so trophy fish essentially cannot be netted free-swimming (hook one first and net
-        // it cooperatively — that path stays open).
-        float lbs = net.camacraft.nicecatch.server.FishSizing.weightLbs(best);
-        double weightFactor = lbs < 2.0F ? 1.0D
-                : lbs < 5.0F ? 0.6D
-                : lbs < 10.0F ? 0.25D
-                : lbs < 15.0F ? 0.08D : 0.03D;
-
-        // Fieldcraft matters: a fish that can see the sweep coming (approached head-on)
-        // mostly evades; come in from behind — sneaking keeps you unnoticed on the way —
-        // or catch it glued to someone's bobber, and the odds hold up. A fleeing fish is
-        // all but impossible to bag.
-        double yaw = Math.toRadians(best.yBodyRot);
-        Vec3 facing = new Vec3(-Math.sin(yaw), 0.0D, Math.cos(yaw));
-        Vec3 approach = new Vec3(best.getX() - player.getX(), 0.0D, best.getZ() - player.getZ());
-        double approachFactor = approach.lengthSqr() > 1.0E-4D
-                && facing.dot(approach.normalize()) > 0.2D ? 1.0D : 0.45D;
-        FishBehavior.FishState state = FishBehavior.state(best);
-        double distractedBonus = state.bobber != null || state.biteBobber != null ? 1.4D : 1.0D;
-
-        double chance = cfg.netCatchChance.get() * weightFactor * approachFactor * distractedBonus
-                * (FishBehavior.isScattering(best) ? 0.15D : 1.0D);
+        double chance = scoopChance(player, best, cfg.netCatchChance.get());
         if (level.random.nextFloat() < chance) {
             FishConversion.catchDirectly(player, best);
+            awardTacticalFishing(player, best);
             // Untangling a squirming fish out of the mesh is what takes time — a miss costs
             // nothing but the scattered, un-nettable spot it leaves behind.
             player.getCooldowns().addCooldown(this, cfg.netCooldownTicks.get());
@@ -159,6 +141,57 @@ public class FishingNetItem extends Item
             FishBehavior.scatter(best, center, cfg.scatterDurationTicks.get());
             FishBehavior.scatterAround(level, center, cfg.scatterRadius.get(), 0.8F, best,
                     FishBehavior.LIGHT_SCARE_COOLDOWN);
+        }
+    }
+
+    /**
+     * The odds of scooping a free-swimming fish by hand, from {@code base} (the net's {@code netCatchChance}): the
+     * net's rules, shared with a water bucket ({@link net.camacraft.nicecatch.server.BucketScoops}).
+     *
+     * <p>Weight decides first: a hand net is a smallfry tool. Under ~2 lbs it's easy money; every band past that
+     * collapses toward "it burst straight out of the mesh", so trophy fish essentially cannot be scooped
+     * free-swimming (hook one first and net it cooperatively; that path stays open). Fieldcraft matters: a fish
+     * that can see the sweep coming (approached head-on) mostly evades; come in from behind (sneaking keeps you
+     * unnoticed on the way) or catch it glued to someone's bobber, and the odds hold up. A fleeing fish is all but
+     * impossible to bag.
+     */
+    public static double scoopChance(Player player, PathfinderMob fish, double base)
+    {
+        float lbs = net.camacraft.nicecatch.server.FishSizing.weightLbs(fish);
+        double weightFactor = lbs < 2.0F ? 1.0D
+                : lbs < 5.0F ? 0.6D
+                : lbs < 10.0F ? 0.25D
+                : lbs < 15.0F ? 0.08D : 0.03D;
+        double yaw = Math.toRadians(fish.yBodyRot);
+        Vec3 facing = new Vec3(-Math.sin(yaw), 0.0D, Math.cos(yaw));
+        Vec3 approach = new Vec3(fish.getX() - player.getX(), 0.0D, fish.getZ() - player.getZ());
+        double approachFactor = approach.lengthSqr() > 1.0E-4D
+                && facing.dot(approach.normalize()) > 0.2D ? 1.0D : 0.45D;
+        FishBehavior.FishState state = FishBehavior.state(fish);
+        double distractedBonus = state.bobber != null || state.biteBobber != null ? 1.4D : 1.0D;
+        return base * weightFactor * approachFactor * distractedBonus
+                * (FishBehavior.isScattering(fish) ? 0.15D : 1.0D);
+    }
+
+    /**
+     * A netted fish counts for Tactical Fishing ({@code netAwardsTacticalFishing}), as a bucketed one does: a
+     * bucketable fish fires vanilla's filled-bucket trigger with its own bucket (so every advancement that asks for
+     * that bucket sees it); a fish with no bucket is given the vanilla advancement outright.
+     */
+    public static void awardTacticalFishing(ServerPlayer player, PathfinderMob fish)
+    {
+        if (!NiceCatchConfig.SERVER.netAwardsTacticalFishing.get()) return;
+        if (fish instanceof Bucketable bucketable) {
+            ItemStack bucket = bucketable.getBucketItemStack();
+            if (!bucket.isEmpty()) {
+                CriteriaTriggers.FILLED_BUCKET.trigger(player, bucket);
+                return;
+            }
+        }
+        Advancement advancement = player.server.getAdvancements().getAdvancement(new ResourceLocation("minecraft", "husbandry/tactical_fishing"));
+        if (advancement == null) return;
+        for (String criterion : advancement.getCriteria().keySet()) {
+            player.getAdvancements().award(advancement, criterion);
         }
     }
 }

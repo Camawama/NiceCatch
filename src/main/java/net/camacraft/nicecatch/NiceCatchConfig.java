@@ -133,6 +133,8 @@ public class NiceCatchConfig
         public final ForgeConfigSpec.DoubleValue netCatchRadius;
         public final ForgeConfigSpec.DoubleValue netCatchChance;
         public final ForgeConfigSpec.IntValue netCooldownTicks;
+        public final ForgeConfigSpec.BooleanValue bucketScoopsLikeNet;
+        public final ForgeConfigSpec.BooleanValue netAwardsTacticalFishing;
         public final ForgeConfigSpec.IntValue trapCheckIntervalTicks;
         public final ForgeConfigSpec.DoubleValue trapCatchChance;
         public final ForgeConfigSpec.DoubleValue trapCatchRadius;
@@ -562,6 +564,14 @@ public class NiceCatchConfig
                     .defineInRange("netCatchChance", 0.55D, 0.0D, 1.0D);
             netCooldownTicks = b.comment("Cooldown between net sweeps.")
                     .defineInRange("netCooldownTicks", 60, 0, 400);
+            bucketScoopsLikeNet = b.comment("A water bucket scoops a free-swimming fish by the fishing net's odds (netCatchChance, then its weight,",
+                            "whether it saw you coming, a bobber holding its attention, a scattered school); a miss scatters the spot like",
+                            "a missed sweep. Off: vanilla's sure catch, which skipped every rule the net has (a rare fish could be",
+                            "bucketed outright). A hooked fish is bucketed as in vanilla either way.")
+                    .define("bucketScoopsLikeNet", true);
+            netAwardsTacticalFishing = b.comment("A fish scooped with the fishing net (or netted off someone's line) counts for the Tactical Fishing",
+                            "advancement, as a bucketed fish does.")
+                    .define("netAwardsTacticalFishing", true);
             b.pop();
 
             b.push("trap");

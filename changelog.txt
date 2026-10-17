@@ -5,6 +5,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (buckets and the net, 2026-10-14)
+- **A water bucket scoops a fish by the fishing net's odds** (`bucketScoopsLikeNet`, on; the owner: "we made it so the
+  fishing net can't easily catch fish as a way to prevent cheating when catching the rare fish, but I remembered that
+  fish can still be caught with a bucket"). Vanilla's bucket took any fish it touched for certain, which skipped every
+  rule the net has and let a rare aura fish be bucketed outright. A bucket on a free-swimming fish now rolls the
+  net's odds (`netCatchChance`, then the fish's weight, whether it saw you coming, a bobber holding its attention, a
+  scattered school; `FishingNetItem.scoopChance`, shared by both): a hit is vanilla's pickup (the fish bucket, its
+  sound, Tactical Fishing), a miss scatters the spot like a missed sweep. A hooked fish is bucketed as in vanilla (a
+  line already holds it). Both sides cancel vanilla's interaction and the server does the pickup itself: vanilla's
+  client half swapped the bucket and discarded its copy of the fish before the server answered, so a fish the server
+  kept would have vanished from view (`server/BucketScoops`).
+- **Tactical Fishing for the net** (`netAwardsTacticalFishing`, on; the owner: "an achievement is given 'Tactical
+  Fishing' when scooping up a fish with a bucket, and I'm wondering if we could also give that achievement when
+  catching a fish with a net"). A fish scooped with the net, or netted off someone's line, fires vanilla's
+  filled-bucket trigger with the fish's own bucket (so any advancement that asks for that bucket sees it); a fish
+  that has no bucket is given `husbandry/tactical_fishing` outright.
+
 ### Fixed (the bobber rides Streams Reflowing's rivers, 2026-10-10)
 - **A cast bobber drifts with the river's current again** (the owner: with Streams Reflowing "when I cast my bobber
   in the water, it just stays stationary despite being in the flowing river"). Streams Reflowing gives its rivers'
