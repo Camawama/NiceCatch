@@ -1,5 +1,6 @@
 package net.camacraft.nicecatch.server;
 
+import net.camacraft.camafy.compat.vs.Ships;
 import net.camacraft.camafy.config.IdMatcher;
 import net.camacraft.nicecatch.NiceCatch;
 import net.camacraft.nicecatch.NiceCatchConfig;
@@ -697,20 +698,20 @@ public final class FishBehavior
             if (e instanceof Boat) {
                 double distSqr = fish.distanceToSqr(e);
                 if (moving && onWater(e) && distSqr <= boatRadius * boatRadius) {
-                    return new Threat(e.position(), true, distSqr <= boatRadius * boatRadius * 0.25D);
+                    return new Threat(Ships.toWorld(fish.level(), e.position()), true, distSqr <= boatRadius * boatRadius * 0.25D);
                 }
                 continue;
             }
             if (e.isInWater() && moving) {
                 double distSqr = fish.distanceToSqr(e);
                 if (distSqr <= swimRadius * swimRadius) {
-                    return new Threat(e.position(), true, distSqr <= swimRadius * swimRadius * 0.25D);
+                    return new Threat(Ships.toWorld(fish.level(), e.position()), true, distSqr <= swimRadius * swimRadius * 0.25D);
                 }
             }
             if (e instanceof Player player && !player.isCrouching()
                     && fish.distanceToSqr(player) <= meleeRadius * meleeRadius
                     && (moving || player.swinging)) {
-                return new Threat(player.position(), false, false);
+                return new Threat(Ships.toWorld(fish.level(), player.position()), false, false);
             }
         }
         return null;

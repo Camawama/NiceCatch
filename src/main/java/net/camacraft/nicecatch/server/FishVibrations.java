@@ -2,7 +2,9 @@ package net.camacraft.nicecatch.server;
 
 import net.camacraft.nicecatch.NiceCatch;
 import net.camacraft.nicecatch.NiceCatchConfig;
+import net.camacraft.camafy.compat.vs.Ships;
 import net.camacraft.nicecatch.server.goal.FoodInterestGoal;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.GameEventTags;
@@ -118,12 +120,18 @@ public final class FishVibrations
         if (!loud && ++budgetUsed > MAX_EVENTS_PER_TICK) return;
 
         double radius = NiceCatchConfig.SERVER.vibrationScareRadius.get() * (loud ? 1.5D : 1.0D);
-        Vec3 pos = event.getEventPosition();
+        // A player seated on a Valkyrien Skies ship is in the shipyard (x near -28,000,000), and so is every event
+        // they make: take it to where the ship really is. VS answers entity queries and distances with a shipyard
+        // point as if it were at the ship, so the fish beside the ship were found, and the occlusion line from the
+        // shipyard to them crossed 31 million blocks, generating every chunk on the way (the owner's 2026-10-29
+        // trip to space and back: 40 s server ticks, then the heap ran out).
+        Vec3 pos = Ships.toWorld(level, event.getEventPosition());
         double radiusSqr = radius * radius;
         AABB box = AABB.ofSize(pos, radius * 2.0D, radius * 2.0D, radius * 2.0D);
         for (PathfinderMob fish : level.getEntitiesOfClass(PathfinderMob.class, box,
                 f -> f.isAlive() && !FishBehavior.isHooked(f) && FishBehavior.isFishLike(f))) {
-            double distSqr = fish.distanceToSqr(pos.x, pos.y, pos.z);
+            // plain coordinates (Entity.distanceToSqr goes through VS's shipyard transform)
+            double distSqr = fish.position().distanceToSqr(pos);
             if (distSqr > radiusSqr) continue;
             if (isOccluded(level, pos, fish.getEyePosition())) continue;
             // Close-by or loud cuts through even a habituated fish's calm, like a swimmer
@@ -152,6 +160,9 @@ public final class FishVibrations
                 Math.floor(eventPos.z) + 0.5D);
         Vec3 to = new Vec3(Math.floor(listenerPos.x) + 0.5D, Math.floor(listenerPos.y) + 0.5D,
                 Math.floor(listenerPos.z) + 0.5D);
+        // Never load a chunk to hear a fish: the clip reads blocks through the server's chunk cache, which
+        // generates what isn't there. A line into unloaded ground is just not occluded.
+        if (!level.hasChunksAt(BlockPos.containing(from), BlockPos.containing(to))) return false;
         return level.isBlockInLine(new ClipBlockStateContext(from, to,
                 state -> state.is(BlockTags.OCCLUDES_VIBRATION_SIGNALS))).getType() == HitResult.Type.BLOCK;
     }

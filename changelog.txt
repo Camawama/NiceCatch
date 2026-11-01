@@ -5,6 +5,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (a player on a ship, 2026-10-29)
+- **A player seated on a Valkyrien Skies ship no longer makes the server generate chunks across the world** (the owner, 2026-10-29: "I noticed my fps was slowly dropping, until it started doing consistent full frame drops where the game would freeze for like 30 seconds at a regular interval", then "Java heap space"). A seated player stands in VS's shipyard (x near -28,000,000), and so does every sound they make; VS answers entity searches and distances from a shipyard point as if it were at the ship, so the fish beside the ship heard the player's footsteps, and the wool check from the shipyard to each fish (`FishVibrations.isOccluded`) walked a 31-million-block line, loading and generating every chunk on it: 40 s server ticks from the moment the ship came back from space, until the heap ran out. Heard positions are taken to the ship's place in the world first (Camafy `Ships.toWorld`), the hearing radius is measured in plain coordinates, the wool check never loads a chunk (a line into unloaded ground is not occluded), and the positions fish flee from are the world's too (`FishBehavior.findThreat`).
+
 ### Changed (buckets and the net, 2026-10-14)
 - **A water bucket scoops a fish by the fishing net's odds** (`bucketScoopsLikeNet`, on; the fishing net was made unable
   to catch fish easily, so a rare fish can't be cheated out of the water, but fish could still be caught with a
