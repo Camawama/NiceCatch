@@ -46,5 +46,5 @@ is needed unless you want a distinct look.
 | `bar_tension_marker.png` | 6×9 | A small notch/arrow riding on top of the bar to show tension as a position instead of a color (accessibility: color-blind friendly). |
 | `fish_size_pips.png` | 3 sprites, 7×7 | Small/medium/large fish pips; could show next to the bar once a fish is hooked so you know what you're fighting. |
 
-When any of these land in the repo, ping me and I'll switch `FishingBarOverlay` from
+When any of these land in the repo, switch `FishingBarOverlay` from
 `graphics.fill(...)` placeholders to `graphics.blit(...)` with these sprites.
