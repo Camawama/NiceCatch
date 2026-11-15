@@ -5,6 +5,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (staff permission, 2026-11-11)
+- `/nicecatch` asks the permission `nicecatch.command.nicecatch` through Camafy's `Permissions` (Camafy 0.1.89), so a
+  permissions mod on the server (LuckPerms) can give it to staff who are not operators. Operator level 2 still opens it.
+
+### Fixed (reel packets and the rod stand, 1.1.2, 2026-11-11)
+- **A snagged mob, pet or boat can't be launched with the reel.** With the bobber hooked in an entity, every reel packet pulled it at once, and only the pull's horizontal speed was capped: a client sending a hundred reel packets inside one tick stacked the ground hop a hundred times and sent the entity hundreds of blocks up. The packets now only leave their crank, and the entity is pulled once a tick with the latest one (`ServerFishingManager.onPlayerTick`); the pull's climb is capped as its horizontal speed is, with room for the hop over a ledge (`pullSnaggedEntity`). A rise the entity already had is left alone.
+- **A rod stand that is moved keeps one rod.** The stand's block entity can now be cleared (`RodStandBlockEntity.clearContent`, vanilla's `Clearable`). `/clone`'s move, and any mod that moves blocks the same way, copies a block entity's data, clears the original and removes it; a stand could not be cleared, so the removed original dropped its rod and bell while the copy kept them too. As with a chest, `/setblock`, `/fill` and `/clone` over a stand no longer drop what it held; breaking it still does.
+
 ### Fixed (a player on a ship, 2026-10-29)
 - **A player seated on a Valkyrien Skies ship no longer makes the server generate chunks across the world** (reported 2026-10-29: the frame rate slowly dropped, then the game froze for about 30 seconds at regular intervals, then "Java heap space"). A seated player stands in VS's shipyard (x near -28,000,000), and so does every sound they make; VS answers entity searches and distances from a shipyard point as if it were at the ship, so the fish beside the ship heard the player's footsteps, and the wool check from the shipyard to each fish (`FishVibrations.isOccluded`) walked a 31-million-block line, loading and generating every chunk on it: 40 s server ticks from the moment the ship came back from space, until the heap ran out. Heard positions are taken to the ship's place in the world first (Camafy `Ships.toWorld`), the hearing radius is measured in plain coordinates, the wool check never loads a chunk (a line into unloaded ground is not occluded), and the positions fish flee from are the world's too (`FishBehavior.findThreat`).
 

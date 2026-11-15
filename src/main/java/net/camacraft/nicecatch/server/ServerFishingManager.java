@@ -116,6 +116,10 @@ public class ServerFishingManager
         float reelScale = 1.0F;
         /** Ticks since the last reel input; times the reel-in out if the player lets go. */
         int idleTicks;
+        /** A reel packet asked for a pull on the snagged entity; onPlayerTick gives it, once a tick. */
+        boolean snagPull;
+        /** The crank of the latest such packet. */
+        float snagCrank;
     }
 
     private static Session session(Player player)
@@ -613,9 +617,11 @@ public class ServerFishingManager
                 completeRetrieve(player, session, r);
                 return;
             }
-            if (pullSnaggedEntity(player, snagged, r, crank)) {
-                completeRetrieve(player, session, r);
-            }
+            // The pull itself waits for the player's tick (onPlayerTick): one a tick, with the
+            // latest crank. Given per packet, a burst of reel packets inside one tick stacked
+            // hop on hop and flung the mob, pet or boat on the line hundreds of blocks up.
+            r.snagPull = true;
+            r.snagCrank = crank;
             return;
         }
 
@@ -688,6 +694,13 @@ public class ServerFishingManager
         double horiz = v.horizontalDistance();
         if (horiz > cap) {
             v = new Vec3(v.x * cap / horiz, v.y, v.z * cap / horiz);
+        }
+        // Upward the pull stops at the same cap, with room for the ledge hop: only the horizontal
+        // speed was capped, so the climb grew with every pull. A rise the entity already had
+        // (a bubble column, a blast) is left alone.
+        double rise = Math.max(Math.max(cap, 0.45D * hop), snagged.getDeltaMovement().y);
+        if (v.y > rise) {
+            v = new Vec3(v.x, rise, v.z);
         }
         snagged.setDeltaMovement(v);
         snagged.hurtMarked = true; // velocity must reach clients or the drag looks frozen
@@ -806,6 +819,19 @@ public class ServerFishingManager
         if (session.fight != null) {
             tickFight(player, session, hook);
             return;
+        }
+
+        // A snagged entity is dragged here, once a tick, by the latest crank the reel packets
+        // left (handleRetrieveInput), however many of them arrived since the last tick.
+        if (session.retrieve != null && session.retrieve.snagPull) {
+            Retrieve r = session.retrieve;
+            r.snagPull = false;
+            Entity snagged = hook.getHookedIn();
+            if (snagged != null && mayHook(player, snagged)
+                    && pullSnaggedEntity(player, snagged, r, r.snagCrank)) {
+                completeRetrieve(player, session, r);
+                return;
+            }
         }
 
         // Reeling in a fishless line: the idle-timeout still abandons a released reel-in —

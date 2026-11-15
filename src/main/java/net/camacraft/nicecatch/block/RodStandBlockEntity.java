@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Clearable;
 import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -43,7 +44,7 @@ import java.util.WeakHashMap;
  * one), rings its bell when something takes it, and hands the fight over the instant the
  * rod is snatched back.
  */
-public class RodStandBlockEntity extends BlockEntity
+public class RodStandBlockEntity extends BlockEntity implements Clearable
 {
     /** Every stand-held hook, server-side; the FishingHook mixin consults this to stay alive. */
     private static final Map<FishingHook, BlockPos> HELD =
@@ -159,6 +160,24 @@ public class RodStandBlockEntity extends BlockEntity
                     new ItemStack(Items.BELL));
             bell = false;
         }
+        FishingHook hook = resolveHook();
+        releaseHook();
+        if (hook != null) hook.discard();
+    }
+
+    /**
+     * Emptied without a drop, as a chest is, by whatever moves or replaces the stand: code that
+     * moves a block entity (/clone's move, and mods that move blocks the way it does) copies its
+     * data, clears the original and then removes it. While the stand could not be cleared, the
+     * removed original spilled its rod and bell and the copy kept them too: two rods from one.
+     * The line goes with the stand, as when it is broken.
+     */
+    @Override
+    public void clearContent()
+    {
+        rod = ItemStack.EMPTY;
+        bell = false;
+        if (level == null || level.isClientSide) return;
         FishingHook hook = resolveHook();
         releaseHook();
         if (hook != null) hook.discard();

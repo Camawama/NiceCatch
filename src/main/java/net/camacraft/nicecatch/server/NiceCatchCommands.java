@@ -125,7 +125,7 @@ public final class NiceCatchCommands
     {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         dispatcher.register(Commands.literal("nicecatch")
-                .requires(source -> source.hasPermission(2))
+                .requires(net.camacraft.camafy.permission.Permissions.require("nicecatch", "command.nicecatch", 2))
                 .then(Commands.literal("summon")
                         .then(Commands.argument("type", ResourceLocationArgument.id()).suggests(FISH_TYPES)
                                 .executes(ctx -> summon(ctx, 1, 0.0F, null))
