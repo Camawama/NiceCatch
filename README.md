@@ -43,6 +43,14 @@ Nice Catch turns fishing into an ecosystem. There is no minigame screen and no i
 - 🧗 **Honest Physics:** The reeled bobber climbs up and over terrain instead of phasing through it, and the hook-set, bites, and fights are fully server-authoritative for multiplayer.
 - 📊 **Trophy Text:** The catch line announces name, weight, and traits the moment you land it.
 
+## Requirements
+- Minecraft 1.20.1 with Forge 47.4 or newer, on the server and every client.
+- [Camafy](https://www.curseforge.com/minecraft/mc-mods/camafy) 0.1.89 or newer (required).
+- Optional: Aquaculture 2 (bait, hooks, line and rods join the fight). Works on Valkyrien Skies ships (fish hear and see a player on a deck), in VS Genesis' and Ad Astra's low gravity, and on Streams Reflowing's rivers.
+
+## Commands
+`/nicecatch` (operator level 2, or the permission `nicecatch.command.nicecatch` from a permissions mod such as LuckPerms): `summon <fish> [count] [weightLbs] [traits]` spawns living fish, `give <fish> [weightLbs] [traits]` gives one as an item, `inspect` shows the fish you look at, `traits` lists every trait.
+
 ## Configuration
 Nearly everything is tunable in the server config: cast power, when a held cast starts to shake and how far it wanders, bite windows and the directional hook-set, every fight number (line length, tension, fatigue, weight-endurance curve), fish AI (interest, scare ranges, schooling, habitat, predation, food attraction, cold-biome bite rates), spawning (school sizes, supplemental spawner targets), size variance and the trait lottery, net and trap balance, and per-species profiles as simple config strings (`minecraft:salmon=boldness:0.45,strength:1.2,predator:true,...`), including per-species size bands, which is how Aquaculture's tiny tuna grows to trophy size. The client config covers reel sensitivity, camera follow and shake, FOV zoom, rod animations (and how much the rod trembles), fish carrying, HUD hints, the hook-set yank threshold, and `requireCircularMotion` (accessibility: reel by holding instead of circling).
 
