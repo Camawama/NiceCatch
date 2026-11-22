@@ -688,6 +688,7 @@ public class NiceCatchConfig
         public final ForgeConfigSpec.BooleanValue rodAnimationsEnabled;
         public final ForgeConfigSpec.DoubleValue castTremble;
         public final ForgeConfigSpec.BooleanValue fishCarryEnabled;
+        public final ForgeConfigSpec.BooleanValue fishCarrySettledPose;
         public final ForgeConfigSpec.DoubleValue scrollReelPerNotch;
 
         Client(ForgeConfigSpec.Builder b)
@@ -728,6 +729,8 @@ public class NiceCatchConfig
                     .defineInRange("castTremble", 1.0D, 0.0D, 3.0D);
             fishCarryEnabled = b.comment("First-person fish carrying: a light fish held in one hand dangles by the tail; a heavy one (8+ lbs) is hefted low with both hands.")
                     .define("fishCarryEnabled", true);
+            fishCarrySettledPose = b.comment("The fish shown in the hand is drawn from a settled pose: the turn, pitch, motion and hurt flash the fish had the moment it was landed are not kept (the carry's look was set up on a fish standing still). Off, a caught fish is shown turned the way it last faced.")
+                    .define("fishCarrySettledPose", true);
             scrollReelPerNotch = b.comment("Crank revolutions added per scroll-wheel notch while working the reel (scroll DOWN = wind line in, scroll UP = deliberately pay line out, easing tension at the cost of ground — matching a real reel handle's motion). 0 disables scroll controls entirely.")
                     .defineInRange("scrollReelPerNotch", 0.12D, 0.0D, 1.0D);
         }

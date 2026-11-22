@@ -173,11 +173,13 @@ public final class FishCarryRenderer
             // Toward the chest's center line (this sign centers it; flipped, it doubles the
             // offset the user saw).
             pose.translate((leftHand ? -1.0D : 1.0D) * CARRY_CENTER, 0.0D, 0.0D);
+            // The type's own height, not the dummy's box: the dummy is sized by the size lottery of
+            // whatever UUID it was made with (see FishSizing), which differs per session.
             // Oversized fish drift out in front of the arms (the hand socket's axes are not
             // perfectly body-aligned, so a giant's bulk accumulates along the off-axis):
             // pull anything bigger than the ordinary two-hander back toward the chest,
             // proportionally and capped. Ordinary heavy fish (the calibrated case) get 0.
-            double oversize = Math.max(0.0D, display.getBbHeight() * scale - 0.9D);
+            double oversize = Math.max(0.0D, display.getType().getHeight() * scale - 0.9D);
             pose.translate(0.0D, 0.0D, -Math.min(0.55D, oversize * 0.45D));
             // SAME yaw for both hands, deliberately: mirroring it (+90 left) faced the fish
             // the opposite way, and the third-person X-90 correction pitching an
@@ -188,7 +190,7 @@ public final class FishCarryRenderer
             // so a sink that keeps growing with fish size slid a trophy tuna visibly out of
             // the hands along the off-axis component. Mid-weights keep their exact old rest;
             // giants settle at the cap instead of drifting away.
-            pose.translate(0.0D, -Math.min(0.42D, display.getBbHeight() * scale * CARRY_SINK), 0.0D);
+            pose.translate(0.0D, -Math.min(0.42D, display.getType().getHeight() * scale * CARRY_SINK), 0.0D);
             if (thirdPerson) {
                 // Levels the carried fish out of its slight downward slope; negative if it
                 // ever tips the other way.
@@ -311,9 +313,42 @@ public final class FishCarryRenderer
                 // A snapshot from another mod version that no longer loads: default look.
             }
         }
+        settleDisplay(created);
         DUMMIES.put(key, created);
         DISPLAY.add(created);
         return created;
+    }
+
+    /**
+     * The carry's look was calibrated on a fish standing as a fresh entity does (a fish given by command, which
+     * carries no snapshot): body yaw 0, no pitch, no motion, no hurt flash. A real catch's snapshot holds the
+     * fish's last turn from the moment it was landed (its steering during the fight), its motion through the
+     * air, and any hurt time, and {@code Entity.load} hands the yaw on to the body and head rotation that
+     * {@code LivingEntityRenderer} turns the model by (180 minus the body yaw). So a heavy fish laid across the
+     * arms pointed its nose anywhere from along the arms to into the chest, differently for every catch, and a
+     * dangling one spun about its hanging axis. Dummies are cached per species and variant, so the first stack shown
+     * decided the pose of every later one of its kind. The display is a picture of the fish, not the fish: every
+     * dummy is settled into the calibrated pose (a fresh living entity also starts with a random yaw of up to 6
+     * degrees from its constructor). Off with {@code fishCarrySettledPose}.
+     */
+    private static void settleDisplay(Entity display)
+    {
+        if (!NiceCatchConfig.CLIENT.fishCarrySettledPose.get()) return;
+        display.setYRot(0.0F);
+        display.setXRot(0.0F);
+        display.yRotO = 0.0F;
+        display.xRotO = 0.0F;
+        display.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        display.fallDistance = 0.0F;
+        display.clearFire();
+        if (display instanceof LivingEntity living) {
+            living.yBodyRot = 0.0F;
+            living.yBodyRotO = 0.0F;
+            living.yHeadRot = 0.0F;
+            living.yHeadRotO = 0.0F;
+            living.hurtTime = 0;
+            living.deathTime = 0;
+        }
     }
 
     /** Item -> entity by the shared registry-name convention (minecraft:cod is both, etc). */
