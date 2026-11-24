@@ -67,7 +67,8 @@ public class ClientEvents
             }
             case IDLE -> {
                 ItemStack stack = player.getItemInHand(event.getHand());
-                if (!RodUtil.isRod(stack)) break;
+                // A spectator's click goes on to the game untouched (which uses nothing for them).
+                if (!RodUtil.isRod(stack) || !ClientFishing.mayFish(player)) break;
                 if (player.fishing == null) {
                     boolean aimingAtNothing = mc.hitResult == null || mc.hitResult.getType() == HitResult.Type.MISS;
                     if (aimingAtNothing && !player.isHandsBusy() && ClientFishing.canStartCharge()
@@ -135,6 +136,7 @@ public class ClientEvents
 
         switch (ClientFishing.phase()) {
             case IDLE -> {
+                if (!ClientFishing.mayFish(player)) break;
                 if (player.fishing == null) {
                     if (!player.isHandsBusy() && ClientFishing.canStartCharge()
                             && !player.getCooldowns().isOnCooldown(event.getItemStack().getItem())) {

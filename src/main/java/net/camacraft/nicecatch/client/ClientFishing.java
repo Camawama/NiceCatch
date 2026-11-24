@@ -258,6 +258,17 @@ public class ClientFishing
         return phase == Phase.IDLE && castCooldown <= 0;
     }
 
+    /**
+     * Whether this player works a rod at all. A spectator still has the rod in the selected slot,
+     * but the game lets a spectator use nothing (its cast would be refused by the server anyway),
+     * and a dead player has no hands: neither starts a cast charge or a reel-in, and a charge
+     * under way when the player turns spectator or dies is dropped without a cast.
+     */
+    public static boolean mayFish(LocalPlayer player)
+    {
+        return !player.isSpectator() && player.isAlive();
+    }
+
     public static void beginCharge(InteractionHand hand)
     {
         phase = Phase.CHARGING;
@@ -337,6 +348,8 @@ public class ClientFishing
 
         switch (phase) {
             case IDLE -> {
+                // A spectator (or a dead player) holding rod control starts nothing.
+                if (!mayFish(player)) break;
                 // With rod control rebound off the use button, holding the key starts the
                 // cast charge directly (the right-click interception path never sees it).
                 if (!RodControls.controlIsUseButton(mc) && canStartCharge()
@@ -358,7 +371,10 @@ public class ClientFishing
                 }
             }
             case CHARGING -> {
-                if (player.fishing != null || mc.screen != null || !RodUtil.isRod(player.getItemInHand(chargeHand))) {
+                // Dropped without a cast: a line already out, a screen opened, the rod put away,
+                // or the player turned spectator or died while holding the charge.
+                if (!mayFish(player) || player.fishing != null || mc.screen != null
+                        || !RodUtil.isRod(player.getItemInHand(chargeHand))) {
                     phase = Phase.IDLE;
                     break;
                 }
